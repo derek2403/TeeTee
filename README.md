@@ -55,12 +55,6 @@ ABCD
 ### Tech Stack Overview
 
 
----
-
-## How We Use Flow blockchain
-
-
-
 
 ---
 
