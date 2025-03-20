@@ -1,4 +1,4 @@
-# node1.py - TEE Node 1 - First half of model layers
+
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from flask import Flask, request, jsonify
