@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  app1:
+    build:
+      context: ./src/app1
+    ports:
+      - "5000:5000"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  app2:
+    build:
+      context: ./src/app2
+    ports:
+      - "5001:5001"
+    depends_on:
+      - app1
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
