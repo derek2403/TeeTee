@@ -63,6 +63,11 @@ ABCD
 
 ---
 
+## How We Are Different
+
+
+---
+
 ## Team
 
 - **Derek Liew Qi Jian**  
