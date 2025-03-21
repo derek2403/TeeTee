@@ -8,6 +8,8 @@ services:
       - "5000:5000"
     networks:
       - app-network
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
     restart: unless-stopped
 
   app2:
@@ -19,6 +21,8 @@ services:
       - app1
     networks:
       - app-network
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
     restart: unless-stopped
 
 networks:
