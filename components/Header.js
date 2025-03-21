@@ -17,8 +17,8 @@ export default function Header() {
           
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <div className="flex items-center gap-8">
-              <Link href="/APIAccess">
-                <span className="font-medium cursor-pointer hover:text-blue-600 transition-colors whitespace-nowrap">API Key Access</span>
+              <Link href="/AIChat">
+                <span className="font-medium cursor-pointer hover:text-blue-600 transition-colors whitespace-nowrap">AI Chat</span>
               </Link>
               <Link href="/ContributionPool">
                 <span className="font-medium cursor-pointer hover:text-blue-600 transition-colors whitespace-nowrap">Contribution Pool</span>
