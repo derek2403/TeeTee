@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import Header from '../components/Header';
 
-export default function TEEVisualization() {
+export default function LandingThreeModel() {
   const mountRef = useRef(null);
 
   useEffect(() => {
@@ -435,19 +434,10 @@ export default function TEEVisualization() {
   }, []);
   
   return (
-    <div className="relative">
-      <div className="absolute top-0 left-0 w-full z-10">
-        <Header />
-      </div>
-      <div 
-        ref={mountRef} 
-        className="w-full h-screen"
-        style={{ background: 'linear-gradient(to bottom, #ffffff, #e6f2ff)' }}
-      />
-      <div className="absolute top-24 left-1/2 transform -translate-x-1/2 text-center text-blue-900 z-10">
-        <h1 className="text-4xl font-bold mb-2">Trusted Execution Environment</h1>
-        <p className="text-xl opacity-80">Secure, Sharded AI Processing</p>
-      </div>
-    </div>
+    <div 
+      ref={mountRef} 
+      className="w-full h-screen"
+      style={{ background: 'linear-gradient(to bottom, #ffffff, #e6f2ff)' }}
+    />
   );
 } 

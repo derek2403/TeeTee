@@ -1,12 +1,8 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { Card, CardHeader, CardBody } from "@heroui/card";
-import { Button } from "@heroui/button";
-import { useState } from "react";
 import Link from 'next/link';
 import { useAccount } from 'wagmi';
 
 export default function Header() {
-  const [selected, setSelected] = useState("api");
   const { isConnected } = useAccount();
 
   return (
