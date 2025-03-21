@@ -3,20 +3,25 @@ import { Card, CardHeader, CardBody, CardFooter } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Tabs, Tab } from "@heroui/tabs";
+import { Select, SelectItem } from "@heroui/select";
 import { useTokenCredits } from '../hooks/useTokenCredits';
 import { useAIChat } from '../hooks/useAIChat';
 
 export default function AIChat() {
   const [activeTab, setActiveTab] = useState('chat');
+  const [selectedModel, setSelectedModel] = useState('ollama'); // Default to token model
   const tokenCredits = useTokenCredits();
   const aiChat = useAIChat(tokenCredits);
 
+  // Whether to use tokens based on model selection
+  const shouldUseTokens = selectedModel === 'ollama';
+
   // Auto-sign transactions when they're pending
   useEffect(() => {
-    if (aiChat.pendingOutputSignature && aiChat.pendingOutputCost > 0) {
+    if (aiChat.pendingOutputSignature && aiChat.pendingOutputCost > 0 && shouldUseTokens) {
       aiChat.signOutputTransaction();
     }
-  }, [aiChat.pendingOutputSignature, aiChat.pendingOutputCost]);
+  }, [aiChat.pendingOutputSignature, aiChat.pendingOutputCost, shouldUseTokens]);
 
   // Adding a style block to handle hiding scrollbars globally
   useEffect(() => {
@@ -48,25 +53,45 @@ export default function AIChat() {
     };
   }, []);
 
+  // Handle model change
+  const handleModelChange = (e) => {
+    setSelectedModel(e.target.value);
+  };
+
+  // Generate response with model awareness
+  const generateModelAwareResponse = () => {
+    // Call the generate response function with model information
+    aiChat.generateResponse(shouldUseTokens);
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar / Navigation - made more compact */}
       <div className="w-64 bg-white border-r border-gray-200 p-3 overflow-hidden">
-        <h2 className="text-xl font-semibold mb-3">TeeTee AI Chat</h2>
-        
-        <Tabs 
-          aria-label="Navigation" 
+
+
+        {/* Token Balance - moved up, right below the heading */}
+        {tokenCredits.isConnected && (
+          <div className="mb-3 p-2 bg-blue-50 rounded-md">
+            <p className="text-xs font-medium text-gray-800">Your Balance</p>
+            <p className="text-lg font-bold">{tokenCredits.tokenBalance} Tokens</p>
+          </div>
+        )}
+
+        <Tabs
+          aria-label="Navigation"
           selectedKey={activeTab}
           onSelectionChange={setActiveTab}
           className="flex flex-col"
-          variant="light"
+          variant="solid"
+          color="primary"
         >
           <Tab key="chat" title="Chat">
-            <div className="pt-1">
-              <Button 
-                color="default" 
-                variant="light" 
-                radius="sm" 
+            <div className="pt-2">
+              <Button
+                color="default"
+                variant="light"
+                radius="sm"
                 className="w-full justify-start mb-1"
                 onClick={aiChat.resetChat}
                 size="sm"
@@ -76,37 +101,44 @@ export default function AIChat() {
             </div>
           </Tab>
           <Tab key="dashboard" title="Dashboard">
-            <div className="pt-1">
+            <div className="pt-2">
               <p className="text-xs text-gray-600">
                 Manage your credits and usage
               </p>
             </div>
           </Tab>
         </Tabs>
-        
-        {/* Token Balance - more compact */}
-        {tokenCredits.isConnected && (
-          <div className="mt-3 p-2 bg-blue-50 rounded-md">
-            <p className="text-xs font-medium text-gray-800">Your Balance</p>
-            <p className="text-lg font-bold">{tokenCredits.tokenBalance} Tokens</p>
-          </div>
-        )}
       </div>
-      
+
       {/* Main Content - Modified for fixed layout with no extra space */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* Chat Tab */}
         {activeTab === 'chat' && (
           <div className="flex flex-col h-full overflow-hidden">
+            {/* Model Selector */}
+            <div className="p-2">
+              <Select
+                isRequired
+                label="Select a model"
+                className="max-w-xs" // Set the width directly
+                size="sm"
+                value={selectedModel}
+                onChange={handleModelChange}
+              >
+                <SelectItem key="self-hosted" value="self-hosted">Self hosted LLM shard (No Tokens Needed)</SelectItem>
+                <SelectItem key="ollama" value="ollama">Ollama 3.2 (Tokens Needed)</SelectItem>
+              </Select>
+            </div>
+
             {/* Combined Area with fixed layout */}
             <div className="flex flex-col h-full overflow-hidden">
-              {!tokenCredits.isConnected ? (
+              {!tokenCredits.isConnected && shouldUseTokens ? (
                 <div className="flex-1 flex items-center justify-center p-4">
                   <Card className="w-full max-w-md">
                     <CardBody className="text-center">
                       <p className="text-lg mb-3">Connect your wallet to chat with the AI</p>
-                      <Button 
-                        color="primary" 
+                      <Button
+                        color="primary"
                         size="md"
                         onClick={tokenCredits.connectWallet}
                       >
@@ -118,45 +150,46 @@ export default function AIChat() {
               ) : (
                 <>
                   {/* Chat Messages - with adjusted height calculation */}
-                  <div 
-                    className="overflow-y-auto p-3" 
-                    style={{ height: "calc(100vh - 140px)" }}
+                  <div
+                    className="overflow-y-auto p-3"
+                    style={{ height: "calc(100vh - 210px)" }} // Further adjusted for bottom margin
                   >
                     {aiChat.messages.length === 0 ? (
                       <div className="flex items-center justify-center h-full">
                         <div className="text-center max-w-md">
                           <h2 className="text-xl font-semibold mb-3">Welcome to TeeTee</h2>
                           <p className="text-gray-600 text-sm">
-                            This is a secure AI assistant running in a Trusted Execution Environment (TEE)
+                            This is a secure AI assistant running in a TEE
                           </p>
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-3">
                         {aiChat.messages.map((message, index) => (
-                          <div 
-                            key={index} 
+                          <div
+                            key={index}
                             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                           >
-                            <div 
-                              className={`max-w-3/4 p-2 rounded-lg ${
-                                message.role === 'user' 
-                                  ? 'bg-blue-600 text-white' 
+                            <div
+                              className={`max-w-[70%] p-2 rounded-lg ${message.role === 'user'
+                                  ? 'bg-blue-600 text-white'
                                   : 'bg-gray-100 text-gray-800'
-                              }`}
+                                }`}
                             >
-                              <p className="whitespace-pre-line text-sm">{message.content}</p>
-                              <div className="mt-1 text-xs opacity-80 text-right">
-                                {message.tokens} tokens
-                              </div>
+                              <p className="whitespace-pre-line text-sm break-words">{message.content}</p>
+                              {message.tokens && shouldUseTokens && (
+                                <div className="mt-1 text-xs opacity-80 text-right">
+                                  {message.tokens} tokens
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}
-                        
+
                         {/* Pending message */}
                         {aiChat.isGenerating && (
                           <div className="flex justify-start">
-                            <div className="max-w-3/4 p-2 rounded-lg bg-gray-100">
+                            <div className="max-w-[70%] p-2 rounded-lg bg-gray-100">
                               <div className="flex space-x-2 items-center">
                                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
                                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-200"></div>
@@ -169,24 +202,24 @@ export default function AIChat() {
                     )}
                   </div>
 
-                  {/* Input Area - reduced height */}
-                  <div className="p-2 border-t" style={{ height: "60px" }}>
-                    {parseInt(tokenCredits.tokenBalance) > 0 ? (
+                  {/* Input Area - reduced height and added bottom margin */}
+                  <div className="p-2 border-t mb-4" style={{ height: "60px" }}>
+                    {(parseInt(tokenCredits.tokenBalance) > 0 || !shouldUseTokens) ? (
                       <div className="flex items-center gap-2">
                         <Input
                           className="flex-1"
-                          type="text" 
+                          type="text"
                           value={aiChat.inputText}
                           onChange={aiChat.handleInputChange}
-                          placeholder="Type your message here..." 
-                          disabled={aiChat.isGenerating || aiChat.pendingOutputSignature}
+                          placeholder="Type your message here..."
+                          disabled={aiChat.isGenerating || (aiChat.pendingOutputSignature && shouldUseTokens)}
                           size="sm"
                           radius="lg"
                         />
                         <Button
                           color="primary"
-                          disabled={!aiChat.inputText.trim() || aiChat.isGenerating || aiChat.pendingOutputSignature}
-                          onClick={aiChat.generateResponse}
+                          disabled={!aiChat.inputText.trim() || aiChat.isGenerating || (aiChat.pendingOutputSignature && shouldUseTokens)}
+                          onClick={generateModelAwareResponse}
                           radius="lg"
                           isIconOnly
                           size="sm"
@@ -199,8 +232,8 @@ export default function AIChat() {
                     ) : (
                       <div className="text-center">
                         <p className="font-medium text-yellow-800 text-xs">You have no tokens remaining</p>
-                        <Button 
-                          color="warning" 
+                        <Button
+                          color="warning"
                           variant="flat"
                           size="sm"
                           onClick={() => setActiveTab('dashboard')}
@@ -215,18 +248,18 @@ export default function AIChat() {
             </div>
           </div>
         )}
-        
+
         {/* Dashboard Tab - more compact */}
         {activeTab === 'dashboard' && (
           <div className="p-3 overflow-y-auto h-full">
             <h1 className="text-xl font-bold mb-3">Dashboard</h1>
-            
+
             {!tokenCredits.isConnected ? (
               <Card className="w-full max-w-md mx-auto">
                 <CardBody className="text-center">
                   <p className="text-lg mb-3">Connect your wallet to manage tokens</p>
-                  <Button 
-                    color="primary" 
+                  <Button
+                    color="primary"
                     size="md"
                     onClick={tokenCredits.connectWallet}
                   >
@@ -248,7 +281,7 @@ export default function AIChat() {
                     </p>
                   </CardBody>
                 </Card>
-                
+
                 {/* Purchase Tokens Card */}
                 <Card shadow="sm" className="w-full">
                   <CardHeader className="py-2">
@@ -287,7 +320,7 @@ export default function AIChat() {
                     </div>
                   </CardBody>
                 </Card>
-                
+
                 {/* Usage History */}
                 <Card shadow="sm" className="w-full md:col-span-2">
                   <CardHeader className="py-2">

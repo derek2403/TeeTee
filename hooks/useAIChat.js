@@ -26,50 +26,55 @@ export function useAIChat(tokenCredits) {
   };
 
   // Generate response and sign input transaction
-  const generateResponse = async () => {
-    if (!inputText.trim() || !tokenCredits.isConnected) return;
+  const generateResponse = async (shouldUseTokens = true) => {
+    if (!inputText.trim()) return;
+    if (shouldUseTokens && !tokenCredits.isConnected) return;
     
     const inputTokenCost = Math.ceil(inputText.length / 4); // Simplified: 4 characters = 1 token
     
-    // Check if user has enough tokens
-    const availableTokens = parseInt(tokenCredits.tokenBalance);
-    if (availableTokens < inputTokenCost) {
-      alert(`Not enough tokens. Input requires ${inputTokenCost} tokens but you only have ${availableTokens}.`);
-      return;
+    // Check if user has enough tokens (only when using token model)
+    if (shouldUseTokens) {
+      const availableTokens = parseInt(tokenCredits.tokenBalance);
+      if (availableTokens < inputTokenCost) {
+        alert(`Not enough tokens. Input requires ${inputTokenCost} tokens but you only have ${availableTokens}.`);
+        return;
+      }
     }
     
-    // Start generating - this immediately signs the input transaction
+    // Start generating
     setIsGenerating(true);
     
-    // Add user message to the chat
+    // Add user message to the chat (with or without tokens based on model)
     const newUserMessage = {
       role: 'user',
       content: inputText,
       timestamp: new Date().toISOString(),
-      tokens: inputTokenCost
+      tokens: shouldUseTokens ? inputTokenCost : null
     };
     
     setMessages(prev => [...prev, newUserMessage]);
     
-    // Add to usage history
-    setTokenUsageHistory(prev => [...prev, {
-      type: 'Input (signed)',
-      text: inputText,
-      tokens: inputTokenCost
-    }]);
+    // Add to usage history if using tokens
+    if (shouldUseTokens) {
+      setTokenUsageHistory(prev => [...prev, {
+        type: 'Input (signed)',
+        text: inputText,
+        tokens: inputTokenCost
+      }]);
     
-    // Simulate transaction for input tokens
-    if (tokenCredits.isConnected) {
-      try {
-        const success = await tokenCredits.useTokens(inputTokenCost);
-        if (!success) {
+      // Simulate transaction for input tokens
+      if (tokenCredits.isConnected) {
+        try {
+          const success = await tokenCredits.useTokens(inputTokenCost);
+          if (!success) {
+            setIsGenerating(false);
+            return;
+          }
+        } catch (error) {
+          console.error("Error handling input token usage:", error);
           setIsGenerating(false);
           return;
         }
-      } catch (error) {
-        console.error("Error handling input token usage:", error);
-        setIsGenerating(false);
-        return;
       }
     }
     
@@ -78,30 +83,54 @@ export function useAIChat(tokenCredits) {
     
     // Generate mock response with setTimeout to simulate delay
     setTimeout(() => {
-      // Simple mock response that's roughly 2x the length of input
-      const response = `This is a simulation of an LLM response to: "${savedInput}". 
+      // Different response based on the model being used
+      let response;
       
+      if (shouldUseTokens) {
+        response = `This is a simulation of an Ollama 3.2 LLM response to: "${savedInput}". 
+        
 In a real LLM integration, this would be where the actual API response appears. For this simulation, we're just generating dummy text that's approximately twice the length of your input to demonstrate how token usage works.
 
 The important concept here is that both your input and the generated output consume tokens from your balance. In a production system, the token calculation would be more sophisticated than just counting characters.`;
+      } else {
+        response = `This is a simulation of your own hosted LLM shard responding to: "${savedInput}".
+
+Since you're using your own hosted LLM shard, no tokens have been deducted from your balance. This option allows you to connect to your own compute resources while still benefiting from the TeeTee secure execution environment.
+
+In a production implementation, this would connect to your designated inference endpoint while maintaining the privacy guarantees of the TEE architecture.`;
+      }
       
       const outputTokenCost = Math.ceil(response.length / 4); // Simplified: 4 characters = 1 token
       
-      // Check if user has enough tokens for output
-      const remainingTokens = parseInt(tokenCredits.tokenBalance);
-      if (remainingTokens < outputTokenCost) {
-        // Not enough tokens for full response - need to truncate
-        const truncatedResponse = response.substring(0, remainingTokens * 4);
-        setMockResponse(truncatedResponse + "... [Response truncated due to insufficient tokens]");
-        setPendingOutputCost(remainingTokens); // Charge only what's available
+      if (shouldUseTokens) {
+        // Check if user has enough tokens for output
+        const remainingTokens = parseInt(tokenCredits.tokenBalance);
+        if (remainingTokens < outputTokenCost) {
+          // Not enough tokens for full response - need to truncate
+          const truncatedResponse = response.substring(0, remainingTokens * 4);
+          setMockResponse(truncatedResponse + "... [Response truncated due to insufficient tokens]");
+          setPendingOutputCost(remainingTokens); // Charge only what's available
+        } else {
+          // Enough tokens for full response
+          setMockResponse(response);
+          setPendingOutputCost(outputTokenCost);
+        }
+        
+        setIsGenerating(false);
+        setPendingOutputSignature(true);
       } else {
-        // Enough tokens for full response
-        setMockResponse(response);
-        setPendingOutputCost(outputTokenCost);
+        // When using self-hosted model, no need for output signature
+        // Add the assistant message to chat immediately
+        const newAssistantMessage = {
+          role: 'assistant',
+          content: response,
+          timestamp: new Date().toISOString(),
+          tokens: null // No tokens used for self-hosted model
+        };
+        
+        setMessages(prev => [...prev, newAssistantMessage]);
+        setIsGenerating(false);
       }
-      
-      setIsGenerating(false);
-      setPendingOutputSignature(true);
     }, 1500); // 1.5 second delay to simulate processing
   };
 
