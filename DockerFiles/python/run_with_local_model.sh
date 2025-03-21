@@ -1,10 +1,11 @@
 #!/bin/bash
 
-# Create directories
+# Create directories in a location that's gitignored
+mkdir -p ~/.cache/huggingface/models
 mkdir -p ./models
 mkdir -p ./offload
 
-# Check if model is already downloaded
+# Update model path to use cache directory
 if [ ! -d "./models/tinyllama-1b" ]; then
     echo "Model not found locally. Downloading first..."
     pip install torch transformers

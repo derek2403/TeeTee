@@ -44,3 +44,27 @@ api.json
 models/*.safetensors # Ignore all similar files
 models/large_model.safetensors
 models/*.safetensors # Ignore all similar files
+DockerFiles/python/models/
+DockerFiles/python/models/tinyllama-1b/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.h5
+
+# Cache directories
+**/__pycache__/
+.cache/
+.pytest_cache/
+.coverage
+
+# Environment
+.env
+.venv/
+venv/
+ENV/
+
+# Docker volumes
+offload/
+.docker-data/
