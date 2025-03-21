@@ -8,6 +8,8 @@ import traceback
 import numpy as np
 import gc
 import os
+import hashlib
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -18,53 +20,73 @@ os.environ["HUGGINGFACE_HUB_DOWNLOAD_TIMEOUT"] = "1800"  # 30 minutes
 
 app = Flask(__name__)
 
-# Initialize tokenizer and model
-logger.info("Initializing Node2 (second half of model)...")
-model_name = "/app/models/tinyllama-1b"
+# For storing the model verification hash
+model_hash = None
+model_info = {}
 
-# Function to load model with retries
-def load_model_with_retries(max_retries=5):
-    retry_count = 0
-    while retry_count < max_retries:
-        try:
-            logger.info(f"Loading tokenizer (attempt {retry_count+1}/{max_retries})...")
-            tokenizer = AutoTokenizer.from_pretrained(
-                model_name,
-                local_files_only=False,
-                resume_download=True
-            )
-            logger.info("Tokenizer loaded successfully")
-            
-            # Force garbage collection
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            
-            logger.info(f"Loading model (attempt {retry_count+1}/{max_retries})...")
-            model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                torch_dtype=torch.float16,
-                device_map="cpu",  # Initial CPU loading
-                low_cpu_mem_usage=True,
-                local_files_only=False,
-                resume_download=True
-            )
-            logger.info("Model loaded successfully")
-            
-            return tokenizer, model
-            
-        except Exception as e:
-            retry_count += 1
-            logger.error(f"Loading attempt {retry_count} failed: {str(e)}")
-            if retry_count >= max_retries:
-                logger.error("Max retries exceeded.")
-                raise
-            logger.info(f"Retrying in 10 seconds...")
-            time.sleep(10)
+def generate_model_hash(model):
+    """Generate a SHA-256 hash of model parameters and architecture"""
+    logger.info("Generating model verification hash...")
+    
+    # Get model architecture info
+    model_arch = {
+        "model_type": model.config.model_type,
+        "hidden_size": model.config.hidden_size,
+        "num_attention_heads": model.config.num_attention_heads,
+        "num_hidden_layers": model.config.num_hidden_layers,
+        "vocab_size": model.config.vocab_size
+    }
+    
+    # Get a sample of model weights (last layer weights)
+    # We'll use the last layer's weights as a representative sample
+    param_sample = None
+    for name, param in model.named_parameters():
+        if f'layers.{len(model.model.layers)-1}' in name and param_sample is None:
+            param_sample = param.data.flatten()[:1000].cpu().numpy().tolist()
+            break
+    
+    # Combine architecture and weights sample
+    hash_data = {
+        "architecture": model_arch,
+        "parameters_sample": param_sample,
+        "model_name": "TinyLlama-1.1B-Chat-v1.0",
+        "total_layers": len(model.model.layers),
+        "node": "2"
+    }
+    
+    # Convert to JSON string and hash with SHA-256
+    hash_str = json.dumps(hash_data, sort_keys=True)
+    hash_result = hashlib.sha256(hash_str.encode()).hexdigest()
+    
+    return hash_result, hash_data
+
+# Initialize tokenizer and model from local directory
+logger.info("Initializing Node2 (second half of model)...")
+model_name = "/app/models/tinyllama-1b"  # Local path in container
 
 try:
-    # Load the model with retry mechanism
-    tokenizer, model = load_model_with_retries()
+    logger.info("Loading tokenizer from local directory...")
+    tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+    logger.info("Tokenizer loaded successfully")
+    
+    # Force garbage collection
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
+    logger.info("Loading model from local directory...")
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype=torch.float16,
+        device_map="cpu",  # Initial CPU loading
+        low_cpu_mem_usage=True,
+        local_files_only=True
+    )
+    logger.info("Model loaded successfully")
+    
+    # Generate and store model hash
+    model_hash, model_info = generate_model_hash(model)
+    logger.info(f"Model verification hash: {model_hash}")
     
     # Move to GPU if available
     if torch.cuda.is_available():
@@ -75,6 +97,7 @@ try:
 except Exception as e:
     logger.error(f"Error loading model: {str(e)}")
     logger.error(traceback.format_exc())
+    raise  # This will cause the container to exit on model load failure
 
 # Get the total layers and mid point
 total_layers = len(model.model.layers)
@@ -148,6 +171,17 @@ def generate():
 def health():
     """Health check endpoint"""
     return jsonify({"status": "ok"})
+
+@app.route('/verify', methods=['GET'])
+def verify_model():
+    """Endpoint to verify the model's identity and integrity"""
+    if model_hash:
+        response = {
+            "model_hash": model_hash,
+        }
+        return jsonify(response)
+    else:
+        return jsonify({"error": "Model hash not available", "status": "error"}), 500
 
 if __name__ == "__main__":
     logger.info("Starting node2 server on port 5001...")

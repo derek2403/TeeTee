@@ -7,12 +7,54 @@ import time
 import traceback
 import gc
 import os
+import hashlib
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('node1')
 
 app = Flask(__name__)
+
+# For storing the model verification hash
+model_hash = None
+model_info = {}
+
+def generate_model_hash(model):
+    """Generate a SHA-256 hash of model parameters and architecture"""
+    logger.info("Generating model verification hash...")
+    
+    # Get model architecture info
+    model_arch = {
+        "model_type": model.config.model_type,
+        "hidden_size": model.config.hidden_size,
+        "num_attention_heads": model.config.num_attention_heads,
+        "num_hidden_layers": model.config.num_hidden_layers,
+        "vocab_size": model.config.vocab_size
+    }
+    
+    # Get a sample of model weights (first layer weights)
+    # We'll use the first layer's weights as a representative sample
+    param_sample = None
+    for name, param in model.named_parameters():
+        if 'layers.0' in name and param_sample is None:
+            param_sample = param.data.flatten()[:1000].cpu().numpy().tolist()
+            break
+    
+    # Combine architecture and weights sample
+    hash_data = {
+        "architecture": model_arch,
+        "parameters_sample": param_sample,
+        "model_name": "TinyLlama-1.1B-Chat-v1.0",
+        "total_layers": len(model.model.layers),
+        "node": "1"
+    }
+    
+    # Convert to JSON string and hash with SHA-256
+    hash_str = json.dumps(hash_data, sort_keys=True)
+    hash_result = hashlib.sha256(hash_str.encode()).hexdigest()
+    
+    return hash_result, hash_data
 
 # Initialize tokenizer and model from local directory
 logger.info("Initializing Node1 (first half of model)...")
@@ -38,6 +80,10 @@ try:
     )
     logger.info("Model loaded successfully")
     
+    # Generate and store model hash
+    model_hash, model_info = generate_model_hash(model)
+    logger.info(f"Model verification hash: {model_hash}")
+    
     # Move to GPU if available
     if torch.cuda.is_available():
         model = model.to("cuda")
@@ -55,6 +101,18 @@ middle_layer = total_layers // 2
 logger.info(f"Model has {total_layers} total layers")
 logger.info(f"Node1 will use layers 0 to {middle_layer-1}")
 logger.info(f"Model initialized on {model.device}")
+
+# Add model verification endpoint
+@app.route('/verify', methods=['GET'])
+def verify_model():
+    """Endpoint to verify the model's identity and integrity"""
+    if model_hash:
+        response = {
+            "model_hash": model_hash,
+        }
+        return jsonify(response)
+    else:
+        return jsonify({"error": "Model hash not available", "status": "error"}), 500
 
 @app.route('/process', methods=['POST'])
 def process_prompt():
