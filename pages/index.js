@@ -12,6 +12,7 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 export default function Home() {
   const [messages, setMessages] = useState([]);

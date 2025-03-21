@@ -1,0 +1,23 @@
+services:
+  app1:
+    image: <username>/llm-node1-cpu
+    network_mode: host
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE2_URL=http://app2:5001
+    volumes:
+      - model-cache:/root/.cache/huggingface
+    
+  app2:
+    image: <username>/llm-node2-cpu
+    network_mode: host
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    volumes:
+      - model-cache:/root/.cache/huggingface
+
+volumes:
+  model-cache: 
