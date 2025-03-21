@@ -17,6 +17,7 @@ import {
   QueryClientProvider,
   QueryClient,
 } from "@tanstack/react-query";
+import { HeroUIProvider } from '@heroui/react'
 
 // Create a config with your desired chains and projectId
 const config = getDefaultConfig({
@@ -34,7 +35,9 @@ export default function App({ Component, pageProps }) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <Component {...pageProps} />
+          <HeroUIProvider>
+            <Component {...pageProps} />
+          </HeroUIProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

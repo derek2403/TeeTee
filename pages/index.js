@@ -1,10 +1,10 @@
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import Header from '../components/Header';
 
 export default function Home() {
   return (
     <div className="min-h-screen p-8">
       <header className="flex justify-center items-center h-full">
-        <ConnectButton />
+       <Header />
       </header>
     </div>
   );
