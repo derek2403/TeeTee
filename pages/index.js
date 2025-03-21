@@ -12,27 +12,19 @@ export default function Home() {
         <Header />
       </div>
       
-      {/* 3D Visualization */}
-      <div className="absolute top-0 left-0 w-full z-0">
-        <LandingThreeModel />
-      </div>
-      
-      {/* Headline Text */}
-      <div className="absolute top-24 left-1/2 transform -translate-x-1/2 text-center text-blue-900 z-10 px-4">
-        <h1 className="text-4xl font-bold mb-2">LLM Sharing Across Multiple Verifiable TEE with Decentralized Inference</h1>
-        <p className="text-xl opacity-80">Secure, Sharded AI Processing</p>
-      </div>
-      
-      {/* Buttons directly below 3D visualization - moved lower */}
-      <div className="absolute top-[80vh] left-1/2 transform -translate-x-1/2 text-center z-10">
-        <div className="flex justify-center gap-4">
-          <Link href="/learn-more">
-            <Button color="primary" radius="sm" size="lg">Learn More</Button>
-          </Link>
-          <Link href="/documentation">
-            <Button color="secondary" radius="sm" size="lg">View Documentation</Button>
-          </Link>
+      {/* Main content area with light blue background */}
+      <div className="absolute top-0 left-0 w-full h-full bg-blue-50">
+        {/* 3D Visualization */}
+        <div className="absolute top-0 left-0 w-full z-0 mt-10">
+          <LandingThreeModel />
         </div>
+        
+        {/* Headline Text */}
+        <div className="absolute top-24 left-1/2 transform -translate-x-1/2 text-center text-blue-900 z-10 px-4 mt-5">
+          <h1 className="text-4xl font-bold mb-2">LLM Sharing Across Multiple Verifiable TEE with Decentralized Inference</h1>
+          <p className="text-xl opacity-80">Secure, Sharded AI Processing</p>
+        </div>
+        
       </div>
       
       {/* Content below the 3D visualization - white cards with API Key Access and Contribution Pool */}
@@ -48,7 +40,7 @@ export default function Home() {
                   Get immediate access to our hosted shared TEEs by subscribing with an API key.
                   Perfect for teams that need reliable, secure AI inference.
                 </p>
-                <Link href="/api-access">
+                <Link href="/APIAccess">
                   <Button color="primary" radius="sm">Get Started</Button>
                 </Link>
               </CardBody>
@@ -63,7 +55,7 @@ export default function Home() {
                   Contribute your own TEE resources to our network and get access to the entire distributed system.
                   Join our decentralized AI infrastructure.
                 </p>
-                <Link href="/contribution-pool">
+                <Link href="/ContributionPool">
                   <Button color="secondary" radius="sm">Join Pool</Button>
                 </Link>
               </CardBody>

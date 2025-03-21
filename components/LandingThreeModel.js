@@ -10,7 +10,7 @@ export default function LandingThreeModel() {
 
     // Scene, camera, renderer
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf0f8ff); // Light blue/white background
+    scene.background = null; // Set to null for transparent background
     
     const camera = new THREE.PerspectiveCamera(
       65, // Wider field of view
@@ -437,7 +437,7 @@ export default function LandingThreeModel() {
     <div 
       ref={mountRef} 
       className="w-full h-screen"
-      style={{ background: 'linear-gradient(to bottom, #ffffff, #e6f2ff)' }}
+      style={{ background: 'transparent' }}
     />
   );
 } 
