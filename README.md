@@ -1,9 +1,9 @@
 # TeeTee
-**Punch Line**
+**LLM Sharing Across Multiple Verifiable TEE with Decentralized Inference**
 
 Logo
 
-Short Desc
+A breakthrough infrastructure that splits massive large LLM across multiple TEE, allowing organizations to collectively access high-performance AI at a fraction of the cost while maintaining complete data privacy and security.
 
 ---
 
