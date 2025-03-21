@@ -42,3 +42,5 @@ next-env.d.ts
 api.json
 /DockerFiles/python/modelsmodels/large_model.safetensors
 models/*.safetensors # Ignore all similar files
+models/large_model.safetensors
+models/*.safetensors # Ignore all similar files
