@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import Header from '../components/Header';
 import contractABI from '../utils/ABI.json';
 
 export default function TestPage() {
@@ -392,8 +391,6 @@ The important concept here is that both your input and the generated output cons
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
-      
       <div className="max-w-4xl mx-auto p-6 mt-8 bg-white rounded-lg shadow-md">
         <h1 className="text-3xl font-bold mb-6">Test Smart Contract</h1>
         

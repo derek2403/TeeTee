@@ -18,6 +18,7 @@ import {
   QueryClient,
 } from "@tanstack/react-query";
 import { HeroUIProvider } from '@heroui/react'
+import Header from '../components/Header';
 
 // Create a config with your desired chains and projectId
 const config = getDefaultConfig({
@@ -36,7 +37,12 @@ export default function App({ Component, pageProps }) {
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
           <HeroUIProvider>
-            <Component {...pageProps} />
+            <div className="flex flex-col min-h-screen">
+              <Header />
+              <main className="flex-grow">
+                <Component {...pageProps} />
+              </main>
+            </div>
           </HeroUIProvider>
         </RainbowKitProvider>
       </QueryClientProvider>

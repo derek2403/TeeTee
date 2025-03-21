@@ -1,4 +1,3 @@
-import Header from '../components/Header';
 import { Card, CardHeader, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
 import LandingThreeModel from '../components/LandingThreeModel';
@@ -7,11 +6,6 @@ import Link from 'next/link';
 export default function Home() {
   return (
     <div className="relative">
-      {/* Header */}
-      <div className="absolute top-0 left-0 w-full z-10">
-        <Header />
-      </div>
-      
       {/* Main content area with light blue background */}
       <div className="absolute top-0 left-0 w-full h-full bg-blue-50">
         {/* 3D Visualization */}
