@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  app2:
+    build:
+      context: ./src/app2
+      platforms:
+        - linux/amd64
+    ports:
+      - "5001:5001"
+    environment:
+      - HF_HOME=/app/models
+      - TRANSFORMERS_OFFLINE=0
+      - TOKENIZERS_PARALLELISM=false
+      - MODEL_SERVER_URL=https://3529-2001-f40-90e-62cd-ace4-d62e-323f-6852.ngrok-free.app
+    restart: on-failure:5
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4 
