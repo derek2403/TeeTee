@@ -196,7 +196,7 @@ export default function ContributionPool() {
             <Tab key="instructions" title="Setup Instructions">
               <ModalBody>
                 <p>
-                  To host a TEE Node for Llama 3.2, you'll need to follow our setup instructions on GitHub.
+                  To host a TEE Node for Llama 3.2, you&apos;ll need to follow our setup instructions on GitHub.
                 </p>
                 <div className="p-4 bg-blue-50 rounded-md my-3">
                   <h3 className="font-medium text-blue-800 mb-2">GitHub Setup Includes:</h3>
@@ -208,7 +208,7 @@ export default function ContributionPool() {
                   </ul>
                 </div>
                 <p className="mt-2">
-                  Click the GitHub button to view detailed instructions, or switch to the "Submit Details" tab if you've already completed the setup.
+                  Click the GitHub button to view detailed instructions, or switch to the &quot;Submit Details&quot; tab if you&apos;ve already completed the setup.
                 </p>
               </ModalBody>
               <ModalFooter>
