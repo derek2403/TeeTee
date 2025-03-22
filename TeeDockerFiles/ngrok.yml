@@ -1,9 +1,0 @@
-version: 2
-authtoken: ${NGROK_AUTHTOKEN}
-tunnels:
-  app1:
-    addr: app1:5002
-    proto: http
-  app2:
-    addr: app2:5001
-    proto: http 
