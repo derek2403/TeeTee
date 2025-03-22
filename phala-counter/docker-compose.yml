@@ -1,0 +1,22 @@
+version: '3'
+services:
+  tee-counter:
+    image: ilovetofu/phala-counter:latest
+    ports:
+      - "5000:5000"
+    volumes:
+      # This socket is provided by Phala's TEE environment
+      # In development environments, this socket won't exist
+      # and the application will fall back to non-TEE mode
+      - /var/run/tappd.sock:/var/run/tappd.sock
+    environment:
+      - PORT=5000
+      # Set to "true" to see more detailed logging
+      - DEBUG=false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"] 
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
