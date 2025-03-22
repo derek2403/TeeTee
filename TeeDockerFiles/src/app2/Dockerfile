@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM --platform=linux/amd64 python:3.9-slim
 
 WORKDIR /app
 
@@ -16,20 +16,25 @@ RUN mkdir -p /app/offload
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir gdown
+
+# Create model directories
+RUN mkdir -p /app/models/tinyllama-1b
 
 # Copy application code
-COPY app.py .
+COPY . .
 
 # Set environment variables for Hugging Face with long timeout
 ENV TRANSFORMERS_CACHE=/root/.cache/huggingface
-ENV HF_HOME=/root/.cache/huggingface
+ENV HF_HOME=/app/models
 ENV HUGGINGFACE_HUB_CACHE=/root/.cache/huggingface
 ENV HUGGINGFACE_HUB_DOWNLOAD_TIMEOUT=1200
 ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 ENV TOKENIZERS_PARALLELISM=false
+ENV TRANSFORMERS_OFFLINE=0
 
 # Expose the application port
-EXPOSE 5002
+EXPOSE 5001
 
-# Run the application 
+# Run the application
 CMD ["python", "app.py"] 

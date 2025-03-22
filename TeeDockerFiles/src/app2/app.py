@@ -10,6 +10,11 @@ import gc
 import os
 import hashlib
 import json
+import requests
+import shutil
+import subprocess
+import sys
+import gdown
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -60,9 +65,52 @@ def generate_model_hash(model):
     
     return hash_result, hash_data
 
+def download_model_from_gdrive():
+    """Download model files from Google Drive"""
+    logger.info("Downloading model files from Google Drive")
+    
+    model_dir = "/app/models/tinyllama-1b"
+    os.makedirs(model_dir, exist_ok=True)
+    
+    # Install gdown if not already installed
+    try:
+        import gdown
+    except ImportError:
+        logger.info("Installing gdown for Google Drive downloads...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "gdown"])
+        import gdown
+    
+    success = True
+    # Download the entire folder
+    try:
+        logger.info(f"Downloading entire model folder from Google Drive...")
+        gdown.download_folder(
+            id="1Iua1_n95NSgndooGFPfppaKTti5mmtEy",
+            output=model_dir,
+            quiet=False
+        )
+        logger.info("Model folder download complete")
+    except Exception as e:
+        logger.error(f"Failed to download model folder: {str(e)}")
+        success = False
+    
+    # Create a symlink from model.safetensors to pytorch_model.bin if needed
+    safetensors_path = os.path.join(model_dir, "model.safetensors")
+    pytorch_path = os.path.join(model_dir, "pytorch_model.bin") 
+    
+    if os.path.exists(safetensors_path) and not os.path.exists(pytorch_path):
+        logger.info("Using model.safetensors as the model weights file")
+        # No need for a symlink as transformers can load .safetensors files directly
+    
+    return success
+
 # Initialize tokenizer and model from local directory
 logger.info("Initializing Node2 (second half of model)...")
 model_name = "/app/models/tinyllama-1b"  # Local path in container
+
+# Try to download model files first
+if not download_model_from_gdrive():
+    logger.error("Failed to download model files. Trying to use local files if available.")
 
 try:
     logger.info("Loading tokenizer from local directory...")
