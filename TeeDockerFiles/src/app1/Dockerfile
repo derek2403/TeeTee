@@ -8,7 +8,16 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     build-essential \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js and npm
+RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
+    apt-get update && apt-get install -y nodejs && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install the Phala dstack SDK
+RUN npm install @phala/dstack-sdk
 
 # Create offload directory
 RUN mkdir -p /app/offload

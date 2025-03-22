@@ -157,6 +157,25 @@ max_new_tokens = 128
 temperature = 0.7
 top_p = 0.9
 
+def get_ra_data(custom_data):
+    """
+    Call the Node script with custom data and return the RA report.
+    """
+    try:
+        result = subprocess.run(
+            ["node", "generate_ra.js", custom_data],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            text=True
+        )
+        ra_report = json.loads(result.stdout)
+        return {"ra_report": ra_report, "custom_data_used": custom_data}
+    except subprocess.CalledProcessError as e:
+        return {"error": "Error generating RA report", "details": e.stderr}
+    except json.JSONDecodeError as je:
+        return {"error": "Invalid JSON returned from Node script", "details": str(je)}
+
 @app.route('/generate', methods=['POST'])
 def generate():
     """Generate completion based on the hidden states from node1"""
@@ -207,7 +226,16 @@ def generate():
         logger.info(f"Generation completed in {generation_time:.2f}s")
         logger.info(f"Generated {len(response_text)} characters")
         
-        return jsonify({"output": response_text})
+        # Generate RA data using the output as custom data
+        logger.info("Generating remote attestation data...")
+        ra_custom_data = f"node2_output:{response_text[:100]}..., time:{time.time()}"
+        ra_data = get_ra_data(ra_custom_data)
+        
+        # Return both the response and RA data
+        return jsonify({
+            "output": response_text,
+            "attestation": ra_data
+        })
         
     except Exception as e:
         logger.error(f"Error generating response: {str(e)}")
