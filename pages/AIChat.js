@@ -9,7 +9,7 @@ import { useAIChat } from '../hooks/useAIChat';
 
 export default function AIChat() {
   const [activeTab, setActiveTab] = useState('chat');
-  const [selectedModel, setSelectedModel] = useState('ollama'); // Default to token model
+  const [selectedModel, setSelectedModel] = useState('ollama'); 
   const tokenCredits = useTokenCredits();
   const aiChat = useAIChat(tokenCredits);
 
@@ -59,9 +59,79 @@ export default function AIChat() {
   };
 
   // Generate response with model awareness
-  const generateModelAwareResponse = () => {
-    // Call the generate response function with model information
-    aiChat.generateResponse(shouldUseTokens);
+  const generateModelAwareResponse = async () => {
+    if (!aiChat.inputText.trim()) return;
+    
+    try {
+      // Calculate tokens for the input (if using tokens)
+      const inputTokenCost = shouldUseTokens ? Math.ceil(aiChat.inputText.length / 4) : 0;
+      
+      // Check if user has enough tokens (only when using token model)
+      if (shouldUseTokens) {
+        const availableTokens = parseInt(tokenCredits.tokenBalance);
+        if (availableTokens < inputTokenCost) {
+          alert(`Not enough tokens. Input requires ${inputTokenCost} tokens but you only have ${availableTokens}.`);
+          return;
+        }
+        
+        // Deduct tokens for input if needed
+        if (inputTokenCost > 0) {
+          const success = await tokenCredits.useTokens(inputTokenCost);
+          if (!success) return;
+        }
+      }
+      
+      // Store the user input before adding to messages
+      const userInput = aiChat.inputText;
+      
+      // Add user message to chat
+      aiChat.addMessage("user", userInput, inputTokenCost);
+      
+      // Clear input using the hook's handleInputChange method
+      // Set an empty value to clear the input
+      const emptyEvent = { target: { value: "" } };
+      aiChat.handleInputChange(emptyEvent);
+      
+      // Start generating - since we can't directly manipulate the isGenerating state
+      // we'll simply proceed with the request
+      
+      // Call our proxy API route instead of the direct endpoint
+      const response = await fetch("/api/tee-proxy", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: userInput,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      // Extract the response from the output field
+      const aiResponse = data.output;
+      
+      // Extract attestation quotes for display (truncated)
+      const attestationQuotes = {
+        node1: data.attestation?.node1_attestation?.ra_report?.quote || "",
+        node2: data.attestation?.ra_report?.quote || "",
+      };
+      
+      // Calculate output tokens
+      const outputTokenCost = shouldUseTokens ? Math.ceil(aiResponse.length / 4) : 0;
+      
+      // Deduct tokens for output if using tokens
+      if (shouldUseTokens && outputTokenCost > 0) {
+        const success = await tokenCredits.useTokens(outputTokenCost);
+        if (!success) return;
+      }
+      
+      // Add the response and quotes to the chat history
+      aiChat.addMessage("assistant", aiResponse, outputTokenCost, attestationQuotes);
+      
+    } catch (error) {
+      console.error("Error generating response:", error);
+    }
   };
 
   return (
@@ -180,6 +250,38 @@ export default function AIChat() {
                               {message.tokens && shouldUseTokens && (
                                 <div className="mt-1 text-xs opacity-80 text-right">
                                   {message.tokens} tokens
+                                </div>
+                              )}
+                              
+                              {/* Display attestation quotes for assistant messages */}
+                              {message.role === 'assistant' && message.attestationQuotes && (
+                                <div className="mt-2 border-t pt-1 text-xs">
+                                  {message.attestationQuotes.node1 && (
+                                    <div className="flex items-center justify-between mt-1">
+                                      <span className="font-mono truncate w-56">{message.attestationQuotes.node1.substring(0, 40)}...</span>
+                                      <button 
+                                        onClick={() => {navigator.clipboard.writeText(message.attestationQuotes.node1)}}
+                                        className="p-1 hover:bg-gray-200 rounded"
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  )}
+                                  {message.attestationQuotes.node2 && (
+                                    <div className="flex items-center justify-between mt-1">
+                                      <span className="font-mono truncate w-56">{message.attestationQuotes.node2.substring(0, 40)}...</span>
+                                      <button 
+                                        onClick={() => {navigator.clipboard.writeText(message.attestationQuotes.node2)}}
+                                        className="p-1 hover:bg-gray-200 rounded"
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
