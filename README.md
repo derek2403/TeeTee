@@ -1,7 +1,7 @@
 # TeeTee
 **LLM Sharing Across Multiple Verifiable TEE with Decentralized Inference**
 
-Logo
+![Logo](https://github.com/derek2403/TeeTee/blob/main/public/logo.png?raw=true)
 
 A breakthrough infrastructure that splits massive large LLM across multiple TEE, allowing organizations to collectively access high-performance AI at a fraction of the cost while maintaining complete data privacy and security.
 
