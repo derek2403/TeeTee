@@ -1,69 +1,5 @@
 [
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_owner1",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_owner2",
-				"type": "address"
-			},
-			{
-				"internalType": "string",
-				"name": "_url",
-				"type": "string"
-			}
-		],
-		"name": "createHostedLLM",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "llmId",
-				"type": "uint256"
-			}
-		],
-		"name": "depositToPool",
-		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "llmId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "_newOwner1",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_newOwner2",
-				"type": "address"
-			},
-			{
-				"internalType": "string",
-				"name": "_newUrl",
-				"type": "string"
-			}
-		],
-		"name": "editHostedLLM",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
@@ -128,6 +64,19 @@
 			}
 		],
 		"name": "HostedLLMEdited",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "llmId",
+				"type": "uint256"
+			}
+		],
+		"name": "HostedLLMRemoved",
 		"type": "event"
 	},
 	{
@@ -225,29 +174,29 @@
 		"type": "event"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "MINIMUM_PAYMENT",
+		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "tokenAmount",
+				"name": "",
 				"type": "uint256"
 			}
 		],
-		"name": "useTokens",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "TOKEN_RATE",
+		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "llmId",
+				"name": "",
 				"type": "uint256"
 			}
 		],
-		"name": "withdrawFromPool",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -274,6 +223,70 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_owner1",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_owner2",
+				"type": "address"
+			},
+			{
+				"internalType": "string",
+				"name": "_url",
+				"type": "string"
+			}
+		],
+		"name": "createHostedLLM",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "llmId",
+				"type": "uint256"
+			}
+		],
+		"name": "depositToPool",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "llmId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_newOwner1",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_newOwner2",
+				"type": "address"
+			},
+			{
+				"internalType": "string",
+				"name": "_newUrl",
+				"type": "string"
+			}
+		],
+		"name": "editHostedLLM",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -380,29 +393,16 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "MINIMUM_PAYMENT",
-		"outputs": [
+		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "llmId",
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "TOKEN_RATE",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
+		"name": "removeHostedLLM",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -435,6 +435,32 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "useTokens",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "llmId",
+				"type": "uint256"
+			}
+		],
+		"name": "withdrawFromPool",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	}
 ]

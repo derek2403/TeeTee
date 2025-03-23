@@ -172,6 +172,31 @@ In a production implementation, this would connect to your designated inference 
     setMockResponse('');
   };
 
+  const addMessage = (role, content, tokens = 0, attestationQuotes = null) => {
+    // Create the message object
+    const message = {
+      role,
+      content,
+      tokens,
+      attestationQuotes
+    };
+
+    // Add to messages
+    setMessages(prev => [...prev, message]);
+
+    // If it's an assistant message with tokens > 0, add to usage history
+    if (role === 'assistant' && tokens > 0) {
+      setTokenUsageHistory(prev => [
+        ...prev,
+        {
+          type: 'Response',
+          tokens,
+          text: content.substring(0, 60) + (content.length > 60 ? '...' : '')
+        }
+      ]);
+    }
+  };
+
   return {
     inputText,
     messages,
@@ -183,6 +208,7 @@ In a production implementation, this would connect to your designated inference 
     handleInputChange,
     generateResponse,
     signOutputTransaction,
-    resetChat
+    resetChat,
+    addMessage
   };
 } 

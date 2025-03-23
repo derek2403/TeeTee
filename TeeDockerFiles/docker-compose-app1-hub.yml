@@ -1,25 +1,23 @@
-version: '3'
-
-services:
-  app1:
-    image: derek2403/app1:latest  # Your Docker Hub image
-    ports:
-      - "5002:5002"
-    environment:
-      - HF_HOME=/app/models
-      - TRANSFORMERS_OFFLINE=0
-      - TOKENIZERS_PARALLELISM=false
-      # Remove this if you're using Google Drive download
-      # - MODEL_SERVER_URL=https://3529-2001-f40-90e-62cd-ace4-d62e-323f-6852.ngrok-free.app
-      # Replace with the actual app2 public URL from Phala
-      - NODE2_URL=https://[your-app2-hash]-5001.dstack-prod5.phala.network
-    restart: on-failure:5
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 180s
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4 
+  version: '3'
+  services:
+    app1:
+      image: derek2403/app1:latest  # Your Docker Hub image
+      ports:
+        - "5002:5002"
+      environment:
+        - HF_HOME=/app/models
+        - TRANSFORMERS_OFFLINE=0
+        - TOKENIZERS_PARALLELISM=false
+        - NODE2_URL=https://[your-app2-hash]-5001.dstack-prod5.phala.network
+      restart: on-failure:5
+      volumes:
+        - /var/run/tappd.sock:/var/run/tappd.sock
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+        interval: 30s
+        timeout: 10s
+        retries: 3
+        start_period: 180s
+      dns:
+        - 8.8.8.8
+        - 8.8.4.4 

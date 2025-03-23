@@ -23,6 +23,28 @@ app = Flask(__name__)
 model_hash = None
 model_info = {}
 
+# Add this near the top with other global variables
+node1_latest_ra_data = None  # For storing the latest RA report from Node1
+
+def get_ra_data(custom_data):
+    """
+    Call the Node script with custom data and return the RA report.
+    """
+    try:
+        result = subprocess.run(
+            ["node", "generate_ra.js", custom_data],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            text=True
+        )
+        ra_report = json.loads(result.stdout)
+        return {"ra_report": ra_report, "custom_data_used": custom_data}
+    except subprocess.CalledProcessError as e:
+        return {"error": "Error generating RA report", "details": e.stderr}
+    except json.JSONDecodeError as je:
+        return {"error": "Invalid JSON returned from Node script", "details": str(je)}
+    
 def generate_model_hash(model):
     """Generate a SHA-256 hash of model parameters and architecture"""
     logger.info("Generating model verification hash...")
@@ -221,6 +243,15 @@ def process_prompt():
         generate_endpoint = f"{node2_url}/generate"
         logger.info(f"Using Node2 endpoint: {generate_endpoint}")
         
+        # Generate RA data using the processed data as custom data
+        logger.info("Generating remote attestation data for processed output...")
+        ra_custom_data = f"node1_process:prompt={prompt[:50]}...,hidden_states_shape={len(hidden_states_list)}x{len(hidden_states_list[0]) if hidden_states_list else 0},time:{time.time()}"
+        ra_data = get_ra_data(ra_custom_data)
+        
+        # Store the RA data in the global variable for the new endpoint to access
+        global node1_latest_ra_data
+        node1_latest_ra_data = ra_data
+        
         # Send to node2 for completion
         response = requests.post(
             generate_endpoint,
@@ -234,12 +265,24 @@ def process_prompt():
         total_time = time.time() - start_time
         logger.info(f"Total request time: {total_time:.2f}s")
         
-        return response.json()
+        # Get the response from node2
+        node2_response = response.json()
+        
+        # Add the RA data to the response
+        if "attestation" in node2_response:
+            # If node2 already has attestation data, combine both
+            node2_response["attestation"]["node1_attestation"] = ra_data
+        else:
+            # Otherwise, add our attestation data
+            node2_response["attestation"] = {"node1_attestation": ra_data}
+        
+        return jsonify(node2_response)
         
     except Exception as e:
         logger.error(f"Error processing prompt: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({"output": f"Error: {str(e)}"})
+      
 
 # Add the client endpoint
 @app.route('/generate', methods=['POST'])
@@ -268,6 +311,20 @@ def generate():
 def health():
     """Health check endpoint"""
     return jsonify({"status": "ok"})
+
+@app.route('/node1_ra_report', methods=['GET'])
+def get_node1_ra_report():
+    """Get the latest RA report from Node1"""
+    if node1_latest_ra_data:
+        return jsonify({
+            "status": "success",
+            "node1_attestation": node1_latest_ra_data
+        })
+    else:
+        return jsonify({
+            "status": "not_ready", 
+            "message": "No RA report has been generated yet"
+        })
 
 if __name__ == "__main__":
     logger.info("Starting node1 server on port 5002...")

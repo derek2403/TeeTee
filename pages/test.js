@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import contractABI from '../utils/ABI.json';
+import useRemoveHostedLLM from '../hooks/useRemoveHostedLLM';
+import useWithdrawFromPool from '../hooks/useWithdrawFromPool';
+import useUseTokens from '../hooks/useUseTokens';
+import useEditHostedLLM from '../hooks/useEditHostedLLM';
+import useGetAllHostedLLMs from '../hooks/useGetAllHostedLLMs';
+import useDepositToPool from '../hooks/useDepositToPool';
+import useCheckBalance from '../hooks/useCheckBalance';
+import useCreateHostedLLM from '../hooks/useCreateHostedLLM';
+
 
 export default function TestPage() {
   // State variables
@@ -10,50 +19,51 @@ export default function TestPage() {
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
   const [contract, setContract] = useState(null);
-  
-  // LLM entries state
-  const [llmEntries, setLlmEntries] = useState([]);
-  const [totalLLMs, setTotalLLMs] = useState(0);
-  
-  // Token state
-  const [tokenBalance, setTokenBalance] = useState('0');
-  
-  // Form states
-  const [formData, setFormData] = useState({
-    owner1: '',
-    owner2: '',
-    url: '',
-  });
-  const [editData, setEditData] = useState({
-    llmId: '',
-    newOwner1: '',
-    newOwner2: '',
-    newUrl: '',
-  });
-  const [depositData, setDepositData] = useState({
-    llmId: '',
-    amount: '0.002',
-  });
-  const [withdrawData, setWithdrawData] = useState({
-    llmId: '',
-  });
-  const [spendTokensData, setSpendTokensData] = useState({
-    tokenAmount: '100',
-  });
-  
-  // Process states
-  const [isCreating, setIsCreating] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isDepositing, setIsDepositing] = useState(false);
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
-  const [isSpendingTokens, setIsSpendingTokens] = useState(false); 
-  const [refreshData, setRefreshData] = useState(0);
-  
-  // Result messages
-  const [resultMessage, setResultMessage] = useState({ type: '', message: '' });
+  const [resultMessage, setResultMessage] = useState('');
   
   // Contract address - adjust this to match your deployed contract
-  const contractAddress = '0x4785815a0CBA353484D566029471Fa2E4C596a3a';
+  const contractAddress = '0x396061f4eBa244416CA7020FA341F8F6A990D991';
+  
+  // Custom hooks
+  const { tokenBalance, fetchTokenBalance } = useCheckBalance(contract);
+  const { llmEntries, totalLLMs, fetchLLMEntries } = useGetAllHostedLLMs(contract);
+  const { 
+    isCreatingLLM, 
+    newLLMData, 
+    handleCreateLLMFormChange, 
+    handleCreateLLM 
+  } = useCreateHostedLLM(contract, address, fetchLLMEntries);
+  const { 
+    isEditingLLM, 
+    editLLMData, 
+    handleEditLLMFormChange, 
+    handleEditLLM 
+  } = useEditHostedLLM(contract, address, fetchLLMEntries);
+  const { 
+    isDepositing, 
+    depositData, 
+    handleDepositFormChange, 
+    handleDeposit 
+  } = useDepositToPool(contract, fetchTokenBalance);
+  const { 
+    isWithdrawing, 
+    withdrawData, 
+    handleWithdrawFormChange, 
+    handleWithdraw 
+  } = useWithdrawFromPool(contract, llmEntries, fetchLLMEntries);
+  const { 
+    isSpendingTokens, 
+    spendTokensData, 
+    handleSpendTokensFormChange, 
+    handleSpendTokens 
+  } = useUseTokens(contract, address, fetchTokenBalance);
+  const {
+    isRemoving,
+    removeData,
+    handleRemoveFormChange,
+    handleRemove,
+    resultMessage: removeResultMessage,
+  } = useRemoveHostedLLM(contract, fetchLLMEntries);
   
   // Connect wallet
   const connectWallet = async () => {
@@ -73,9 +83,6 @@ export default function TestPage() {
         // Check if connected user is contract owner
         const ownerAddress = await contract.contractOwner();
         setIsContractOwner(accounts[0].toLowerCase() === ownerAddress.toLowerCase());
-        
-        // Fetch token balance
-        fetchTokenBalance(accounts[0], contract);
         
         // Setup listeners for account changes
         window.ethereum.on("accountsChanged", handleAccountsChanged);
@@ -101,383 +108,18 @@ export default function TestPage() {
         const ownerAddress = await contract.contractOwner();
         setIsContractOwner(accounts[0].toLowerCase() === ownerAddress.toLowerCase());
         // Update token balance for new account
-        fetchTokenBalance(accounts[0], contract);
+        fetchTokenBalance();
       }
-    }
-  };
-  
-  // Fetch token balance
-  const fetchTokenBalance = async (userAddress, contractInstance) => {
-    try {
-      if (!contractInstance) return;
-      
-      // Get token balance from contract
-      const balance = await contractInstance.checkBalance();
-      setTokenBalance(balance.toString());
-      
-    } catch (error) {
-      console.error("Error fetching token balance:", error);
-    }
-  };
-  
-  // Fetch all LLM entries
-  const fetchLLMEntries = async () => {
-    try {
-      if (!contract) return;
-      
-      const entries = await contract.getAllHostedLLMs();
-      setLlmEntries(entries);
-      
-      const total = await contract.totalHostedLLMs();
-      setTotalLLMs(parseInt(total.toString()));
-    } catch (error) {
-      console.error("Error fetching LLM entries:", error);
-    }
-  };
-  
-  // Handle form input changes for creating new LLM
-  const handleCreateFormChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  // Handle form input changes for editing LLM
-  const handleEditFormChange = (e) => {
-    const { name, value } = e.target;
-    setEditData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  // Handle form input changes for deposit
-  const handleDepositFormChange = (e) => {
-    const { name, value } = e.target;
-    setDepositData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  // Handle form input changes for withdraw
-  const handleWithdrawFormChange = (e) => {
-    const { name, value } = e.target;
-    setWithdrawData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  // Handle form input changes for spending tokens (user)
-  const handleSpendTokensFormChange = (e) => {
-    const { name, value } = e.target;
-    setSpendTokensData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  // Create new LLM entry
-  const handleCreateLLM = async (e) => {
-    e.preventDefault();
-    
-    try {
-      if (!contract) return;
-      
-      setIsCreating(true);
-      setResultMessage({ type: '', message: '' });
-      
-      const { owner1, owner2, url } = formData;
-      
-      if (!ethers.isAddress(owner1) || !ethers.isAddress(owner2) || !url.trim()) {
-        setResultMessage({ 
-          type: 'error', 
-          message: 'Please provide valid addresses and URL' 
-        });
-        setIsCreating(false);
-        return;
-      }
-      
-      const tx = await contract.createHostedLLM(owner1, owner2, url);
-      await tx.wait();
-      
-      setFormData({ owner1: '', owner2: '', url: '' });
-      setIsCreating(false);
-      setResultMessage({ 
-        type: 'success', 
-        message: 'LLM entry created successfully!' 
-      });
-      
-      // Trigger refresh
-      setRefreshData(prev => prev + 1);
-      
-    } catch (error) {
-      console.error("Create LLM error:", error);
-      setResultMessage({ 
-        type: 'error', 
-        message: `Error: ${error.message}` 
-      });
-      setIsCreating(false);
-    }
-  };
-  
-  // Edit LLM entry
-  const handleEditLLM = async (e) => {
-    e.preventDefault();
-    
-    try {
-      if (!contract) return;
-      
-      setIsEditing(true);
-      setResultMessage({ type: '', message: '' });
-      
-      const { llmId, newOwner1, newOwner2, newUrl } = editData;
-      
-      if (!llmId.trim() || isNaN(parseInt(llmId))) {
-        setResultMessage({ 
-          type: 'error', 
-          message: 'Please provide a valid LLM ID' 
-        });
-        setIsEditing(false);
-        return;
-      }
-      
-      // Only validate addresses if they're provided and not "0" (they're optional)
-      if (newOwner1 && newOwner1 !== "0" && !ethers.isAddress(newOwner1)) {
-        setResultMessage({ 
-          type: 'error', 
-          message: 'Invalid owner1 address' 
-        });
-        setIsEditing(false);
-        return;
-      }
-      
-      if (newOwner2 && newOwner2 !== "0" && !ethers.isAddress(newOwner2)) {
-        setResultMessage({ 
-          type: 'error', 
-          message: 'Invalid owner2 address' 
-        });
-        setIsEditing(false);
-        return;
-      }
-      
-      // Convert empty strings to zero address, "0" should also be treated as "keep current"
-      const owner1Param = newOwner1.trim() && newOwner1 !== "0" ? newOwner1 : ethers.ZeroAddress;
-      const owner2Param = newOwner2.trim() && newOwner2 !== "0" ? newOwner2 : ethers.ZeroAddress;
-      const urlParam = newUrl.trim() && newUrl !== "0" ? newUrl : "0";
-      
-      console.log("Editing LLM with params:", {
-        llmId: parseInt(llmId),
-        owner1: owner1Param,
-        owner2: owner2Param,
-        url: urlParam
-      });
-      
-      const tx = await contract.editHostedLLM(
-        parseInt(llmId), 
-        owner1Param, 
-        owner2Param, 
-        urlParam
-      );
-      await tx.wait();
-      
-      setEditData({ llmId: '', newOwner1: '', newOwner2: '', newUrl: '' });
-      setIsEditing(false);
-      setResultMessage({ 
-        type: 'success', 
-        message: 'LLM entry updated successfully!' 
-      });
-      
-      // Trigger refresh
-      setRefreshData(prev => prev + 1);
-      
-    } catch (error) {
-      console.error("Edit LLM error:", error);
-      setResultMessage({ 
-        type: 'error', 
-        message: `Error: ${error.message}` 
-      });
-      setIsEditing(false);
-    }
-  };
-  
-  // Deposit to pool and receive tokens
-  const handleDeposit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      if (!contract) return;
-      
-      setIsDepositing(true);
-      setResultMessage({ type: '', message: '' });
-      
-      const { llmId, amount } = depositData;
-      
-      if (!llmId.trim() || isNaN(parseInt(llmId)) || !amount || parseFloat(amount) < 0.002) {
-        setResultMessage({ 
-          type: 'error', 
-          message: 'Please provide valid LLM ID and amount (minimum 0.002 ETH)' 
-        });
-        setIsDepositing(false);
-        return;
-      }
-      
-      const weiAmount = ethers.parseEther(amount);
-      const tx = await contract.depositToPool(parseInt(llmId), {
-        value: weiAmount
-      });
-      
-      await tx.wait();
-      
-      setDepositData({ ...depositData, amount: '0.002' });
-      setIsDepositing(false);
-      setResultMessage({ 
-        type: 'success', 
-        message: `Successfully deposited ${amount} ETH to pool and received tokens!` 
-      });
-      
-      // Update token balance
-      fetchTokenBalance(address, contract);
-      
-      // Trigger refresh
-      setRefreshData(prev => prev + 1);
-      
-    } catch (error) {
-      console.error("Deposit error:", error);
-      setResultMessage({ 
-        type: 'error', 
-        message: `Error: ${error.message}` 
-      });
-      setIsDepositing(false);
-    }
-  };
-  
-  // Withdraw from pool and split profits between owner1 and owner2
-  const handleWithdraw = async (e) => {
-    e.preventDefault();
-    
-    try {
-      if (!contract) return;
-      
-      setIsWithdrawing(true);
-      setResultMessage({ type: '', message: '' });
-      
-      const { llmId } = withdrawData;
-      
-      if (!llmId.trim() || isNaN(parseInt(llmId))) {
-        setResultMessage({ 
-          type: 'error', 
-          message: 'Please provide a valid LLM ID' 
-        });
-        setIsWithdrawing(false);
-        return;
-      }
-      
-      // Get LLM entry to check owners and pool balance
-      const llmIndex = parseInt(llmId);
-      if (llmIndex >= llmEntries.length) {
-        setResultMessage({ 
-          type: 'error', 
-          message: 'Invalid LLM ID' 
-        });
-        setIsWithdrawing(false);
-        return;
-      }
-      
-      const entry = llmEntries[llmIndex];
-      if (entry.owner1 === ethers.ZeroAddress || entry.owner2 === ethers.ZeroAddress) {
-        setResultMessage({ 
-          type: 'error', 
-          message: 'LLM entry has invalid owner addresses' 
-        });
-        setIsWithdrawing(false);
-        return;
-      }
-      
-      // Check if pool has any balance
-      if (entry.poolBalance.toString() === '0') {
-        setResultMessage({ 
-          type: 'error', 
-          message: 'Pool is empty' 
-        });
-        setIsWithdrawing(false);
-        return;
-      }
-      
-      const tx = await contract.withdrawFromPool(llmIndex);
-      await tx.wait();
-      
-      setIsWithdrawing(false);
-      setResultMessage({ 
-        type: 'success', 
-        message: `Successfully withdrew ${ethers.formatEther(entry.poolBalance)} ETH from pool and split it between the owners!` 
-      });
-      
-      // Trigger refresh
-      setRefreshData(prev => prev + 1);
-      
-    } catch (error) {
-      console.error("Withdraw error:", error);
-      setResultMessage({ 
-        type: 'error', 
-        message: `Error: ${error.message}` 
-      });
-      setIsWithdrawing(false);
-    }
-  };
-  
-  // User spends their own tokens
-  const handleSpendTokens = async (e) => {
-    e.preventDefault();
-    
-    try {
-      if (!contract) return;
-      
-      setIsSpendingTokens(true);
-      setResultMessage({ type: '', message: '' });
-      
-      const { tokenAmount } = spendTokensData;
-      
-      if (!tokenAmount || parseInt(tokenAmount) <= 0) {
-        setResultMessage({ 
-          type: 'error', 
-          message: 'Please provide a valid token amount' 
-        });
-        setIsSpendingTokens(false);
-        return;
-      }
-      
-      const tx = await contract.useTokens(tokenAmount);
-      await tx.wait();
-      
-      setSpendTokensData({ ...spendTokensData, tokenAmount: '100' });
-      setIsSpendingTokens(false);
-      setResultMessage({ 
-        type: 'success', 
-        message: `Successfully used ${tokenAmount} tokens!` 
-      });
-      
-      // Update token balance
-      fetchTokenBalance(address, contract);
-      
-    } catch (error) {
-      console.error("Spend tokens error:", error);
-      setResultMessage({ 
-        type: 'error', 
-        message: `Error: ${error.message}` 
-      });
-      setIsSpendingTokens(false);
     }
   };
   
   // Fill edit form with selected LLM data
   const handleSelectLLM = (index) => {
-    const llm = llmEntries[index];
-    setEditData({
-      llmId: index.toString(),
-      newOwner1: '',
-      newOwner2: '',
-      newUrl: ''
-    });
-    
-    // Also fill the deposit and withdraw forms
-    setDepositData({
-      ...depositData,
-      llmId: index.toString()
-    });
-    
-    setWithdrawData({
-      ...withdrawData,
-      llmId: index.toString()
-    });
+    // Set LLM ID for edit, deposit, withdraw, and remove forms
+    handleEditLLMFormChange({ target: { name: 'llmId', value: index.toString() } });
+    handleDepositFormChange({ target: { name: 'llmId', value: index.toString() } });
+    handleWithdrawFormChange({ target: { name: 'llmId', value: index.toString() } });
+    handleRemoveFormChange({ target: { name: 'llmId', value: index.toString() } });
   };
   
   // Init effect - check if wallet already connected
@@ -507,12 +149,42 @@ export default function TestPage() {
     };
   }, []);
   
-  // Effect to fetch LLM entries whenever connected or data refreshed
+  // Effect to fetch initial data when connected
   useEffect(() => {
     if (isConnected && contract) {
       fetchLLMEntries();
+      fetchTokenBalance();
     }
-  }, [isConnected, contract, refreshData]);
+  }, [isConnected, contract]);
+  
+  // Set global result message by watching hook messages
+  useEffect(() => {
+    // Priority order for messages
+    if (isCreatingLLM?.resultMessage) setResultMessage(isCreatingLLM.resultMessage);
+    else if (isEditingLLM?.resultMessage) setResultMessage(isEditingLLM.resultMessage);
+    else if (isDepositing?.resultMessage) setResultMessage(isDepositing.resultMessage);
+    else if (isWithdrawing?.resultMessage) setResultMessage(isWithdrawing.resultMessage);
+    else if (isSpendingTokens?.resultMessage) setResultMessage(isSpendingTokens.resultMessage);
+    else if (removeResultMessage) setResultMessage(removeResultMessage);
+  }, [
+    isCreatingLLM?.resultMessage,
+    isEditingLLM?.resultMessage,
+    isDepositing?.resultMessage,
+    isWithdrawing?.resultMessage,
+    isSpendingTokens?.resultMessage,
+    removeResultMessage
+  ]);
+
+  // Helper function for safe BigNumber formatting
+  const safeFormatEther = (value) => {
+    if (!value) return "0";
+    try {
+      return ethers.formatEther(value);
+    } catch (error) {
+      console.error("Error formatting BigNumber:", error);
+      return "0";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -544,11 +216,11 @@ export default function TestPage() {
               )}
             </div>
             
-            {resultMessage.type && (
+            {resultMessage && (
               <div className={`p-4 rounded-md ${
-                resultMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                resultMessage.includes('Error') ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
               }`}>
-                {resultMessage.message}
+                {resultMessage}
               </div>
             )}
             
@@ -578,13 +250,13 @@ export default function TestPage() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
                             {llm.owner2.substring(0, 8)}...{llm.owner2.substring(llm.owner2.length - 6)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 overflow-hidden text-ellipsis" style={{ maxWidth: '200px' }}>
                             <a href={llm.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
                               {llm.url.length > 30 ? `${llm.url.substring(0, 30)}...` : llm.url}
                             </a>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {ethers.formatEther(llm.poolBalance)} ETH
+                            {safeFormatEther(llm.poolBalance)} ETH
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <button 
@@ -598,17 +270,17 @@ export default function TestPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                  </div>
               ) : (
                 <p className="text-gray-500">No LLM entries found. Create one below.</p>
-              )}
-            </div>
-            
+                )}
+              </div>
+              
             {/* User Deposit Section */}
             <div className="p-4 border rounded-lg bg-purple-50">
               <h2 className="text-xl font-semibold mb-4">Purchase Tokens</h2>
               <p className="text-sm text-gray-600 mb-3">Deposit ETH to purchase tokens. For every 0.002 ETH, you'll receive 100,000 tokens.</p>
-              <form onSubmit={handleDeposit} className="space-y-4">
+              <form onSubmit={(e) => { e.preventDefault(); handleDeposit(); }} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">LLM ID</label>
                   <input
@@ -620,6 +292,7 @@ export default function TestPage() {
                     placeholder="0"
                     required
                   />
+                  <p className="text-sm text-gray-500 mt-1">Use the "Select" button above to fill this automatically</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Amount (ETH, min 0.002)</label>
@@ -638,13 +311,13 @@ export default function TestPage() {
                       Math.floor((parseFloat(depositData.amount) / 0.002) * 100000) : 0} tokens
                   </p>
                 </div>
-                <button
+                    <button
                   type="submit"
-                  disabled={isDepositing || !depositData.llmId}
+                  disabled={isDepositing}
                   className="w-full px-6 py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-400"
                 >
                   {isDepositing ? 'Processing...' : 'Deposit & Get Tokens'}
-                </button>
+                    </button>
               </form>
             </div>
             
@@ -652,7 +325,7 @@ export default function TestPage() {
             <div className="p-4 border rounded-lg bg-teal-50">
               <h2 className="text-xl font-semibold mb-4">Use Your Tokens</h2>
               <p className="text-sm text-gray-600 mb-3">Spend your tokens to use LLM services.</p>
-              <form onSubmit={handleSpendTokens} className="space-y-4">
+              <form onSubmit={(e) => { e.preventDefault(); handleSpendTokens(); }} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Token Amount to Use</label>
                   <input
@@ -683,51 +356,51 @@ export default function TestPage() {
             {/* Create LLM Form */}
             <div className="p-4 border rounded-lg bg-green-50">
               <h2 className="text-xl font-semibold mb-4">Create New Hosted LLM</h2>
-              <form onSubmit={handleCreateLLM} className="space-y-4">
+              <form onSubmit={(e) => { e.preventDefault(); handleCreateLLM(); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                  <input
+                    type="url"
+                    name="url"
+                    value={newLLMData.url}
+                    onChange={handleCreateLLMFormChange}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="https://example.com"
+                    required
+                  />
+                    </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Owner 1 Address</label>
                     <input
                       type="text"
                       name="owner1"
-                      value={formData.owner1}
-                      onChange={handleCreateFormChange}
+                      value={newLLMData.owner1}
+                      onChange={handleCreateLLMFormChange}
                       className="w-full p-2 border rounded-md"
-                      placeholder="0x..."
-                      required
+                      placeholder={address}
                     />
+                    <p className="text-sm text-gray-500 mt-1">Leave blank to use your address</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Owner 2 Address</label>
                     <input
                       type="text"
                       name="owner2"
-                      value={formData.owner2}
-                      onChange={handleCreateFormChange}
+                      value={newLLMData.owner2}
+                      onChange={handleCreateLLMFormChange}
                       className="w-full p-2 border rounded-md"
-                      placeholder="0x..."
-                      required
+                      placeholder={address}
                     />
+                    <p className="text-sm text-gray-500 mt-1">Leave blank to use your address</p>
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
-                  <input
-                    type="url"
-                    name="url"
-                    value={formData.url}
-                    onChange={handleCreateFormChange}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="https://..."
-                    required
-                  />
-                </div>
+                  </div>
                 <button
                   type="submit"
-                  disabled={isCreating}
+                  disabled={isCreatingLLM}
                   className="w-full px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
                 >
-                  {isCreating ? 'Creating...' : 'Create Hosted LLM'}
+                  {isCreatingLLM ? 'Creating...' : 'Create Hosted LLM'}
                 </button>
               </form>
             </div>
@@ -735,28 +408,39 @@ export default function TestPage() {
             {/* Edit LLM Form */}
             <div className="p-4 border rounded-lg bg-yellow-50">
               <h2 className="text-xl font-semibold mb-4">Edit Hosted LLM</h2>
-              <form onSubmit={handleEditLLM} className="space-y-4">
+              <form onSubmit={(e) => { e.preventDefault(); handleEditLLM(); }} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">LLM ID</label>
                   <input
                     type="number"
                     name="llmId"
-                    value={editData.llmId}
-                    onChange={handleEditFormChange}
+                    value={editLLMData.llmId}
+                    onChange={handleEditLLMFormChange}
                     className="w-full p-2 border rounded-md"
                     placeholder="0"
                     required
                   />
                   <p className="text-sm text-gray-500 mt-1">Use the "Select" button above to fill this automatically</p>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New URL (optional)</label>
+                  <input
+                    type="url"
+                    name="url"
+                    value={editLLMData.url}
+                    onChange={handleEditLLMFormChange}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Leave blank or enter 0 to keep current"
+                  />
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">New Owner 1 (optional)</label>
                     <input
                       type="text"
-                      name="newOwner1"
-                      value={editData.newOwner1}
-                      onChange={handleEditFormChange}
+                      name="owner1"
+                      value={editLLMData.owner1}
+                      onChange={handleEditLLMFormChange}
                       className="w-full p-2 border rounded-md"
                       placeholder="Leave blank or enter 0 to keep current"
                     />
@@ -765,31 +449,20 @@ export default function TestPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">New Owner 2 (optional)</label>
                     <input
                       type="text"
-                      name="newOwner2"
-                      value={editData.newOwner2}
-                      onChange={handleEditFormChange}
+                      name="owner2"
+                      value={editLLMData.owner2}
+                      onChange={handleEditLLMFormChange}
                       className="w-full p-2 border rounded-md"
                       placeholder="Leave blank or enter 0 to keep current"
                     />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">New URL (optional)</label>
-                  <input
-                    type="url"
-                    name="newUrl"
-                    value={editData.newUrl}
-                    onChange={handleEditFormChange}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Leave blank or enter 0 to keep current"
-                  />
+              </div>
                 </div>
                 <button
                   type="submit"
-                  disabled={isEditing || !editData.llmId}
+                  disabled={isEditingLLM || !editLLMData.llmId}
                   className="w-full px-6 py-3 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:bg-gray-400"
                 >
-                  {isEditing ? 'Updating...' : 'Update Hosted LLM'}
+                  {isEditingLLM ? 'Updating...' : 'Update Hosted LLM'}
                 </button>
               </form>
             </div>
@@ -798,32 +471,109 @@ export default function TestPage() {
             <div className="p-4 border rounded-lg bg-red-50">
               <h2 className="text-xl font-semibold mb-4">Withdraw from Pool</h2>
               <p className="text-sm text-gray-600 mb-3">Withdraws the entire ETH balance from the pool and automatically splits it between the two LLM owners.</p>
-              <form onSubmit={handleWithdraw} className="space-y-4">
+              <form onSubmit={(e) => { e.preventDefault(); handleWithdraw(); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">LLM ID</label>
+                      <input
+                        type="number"
+                    name="llmId"
+                    value={withdrawData.llmId}
+                    onChange={handleWithdrawFormChange}
+                        className="w-full p-2 border rounded-md"
+                    placeholder="0"
+                    required
+                      />
+                    </div>
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-gray-700">
+                    Selected Pool Balance: {withdrawData.llmId && !isNaN(parseInt(withdrawData.llmId)) && 
+                      parseInt(withdrawData.llmId) < llmEntries.length && llmEntries[parseInt(withdrawData.llmId)]
+                      ? `${safeFormatEther(llmEntries[parseInt(withdrawData.llmId)].poolBalance)} ETH` 
+                      : "0 ETH"}
+                  </p>
+                  
+                  {/* Debug info */}
+                  {withdrawData.llmId && !isNaN(parseInt(withdrawData.llmId)) && 
+                   parseInt(withdrawData.llmId) < llmEntries.length && llmEntries[parseInt(withdrawData.llmId)] && (
+                    <div className="mt-2 p-2 bg-red-100 rounded text-xs">
+                      <p><strong>Debug Info:</strong></p>
+                      <p>Owner 1: {llmEntries[parseInt(withdrawData.llmId)].owner1}</p>
+                      <p>Owner 2: {llmEntries[parseInt(withdrawData.llmId)].owner2}</p>
+                      <p>Pool Balance (wei): {llmEntries[parseInt(withdrawData.llmId)].poolBalance.toString()}</p>
+                      <p>Owner 1 is zero address: {llmEntries[parseInt(withdrawData.llmId)].owner1 === ethers.ZeroAddress ? "Yes" : "No"}</p>
+                      <p>Owner 2 is zero address: {llmEntries[parseInt(withdrawData.llmId)].owner2 === ethers.ZeroAddress ? "Yes" : "No"}</p>
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={
+                    isWithdrawing || 
+                    !withdrawData.llmId || 
+                    !llmEntries || 
+                    !withdrawData.llmId || 
+                    isNaN(parseInt(withdrawData.llmId)) || 
+                    parseInt(withdrawData.llmId) >= llmEntries.length || 
+                    !llmEntries[parseInt(withdrawData.llmId)] || 
+                    !llmEntries[parseInt(withdrawData.llmId)].poolBalance || 
+                    llmEntries[parseInt(withdrawData.llmId)].poolBalance.toString() === '0' ||
+                    llmEntries[parseInt(withdrawData.llmId)].owner1 === ethers.ZeroAddress ||
+                    llmEntries[parseInt(withdrawData.llmId)].owner2 === ethers.ZeroAddress
+                  }
+                  className="w-full px-6 py-3 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400"
+                >
+                  {isWithdrawing ? 'Withdrawing...' : 'Withdraw & Split Between Owners'}
+                </button>
+              </form>
+            </div>
+
+            {/* Remove LLM */}
+            <div className="p-4 border rounded-lg bg-pink-50">
+              <h2 className="text-xl font-semibold mb-4">Remove Hosted LLM</h2>
+              <p className="text-sm text-gray-600 mb-3">Remove a Hosted LLM entry from the contract. The pool balance must be zero.</p>
+              <form onSubmit={(e) => { e.preventDefault(); handleRemove(); }} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">LLM ID</label>
                   <input
                     type="number"
                     name="llmId"
-                    value={withdrawData.llmId}
-                    onChange={handleWithdrawFormChange}
+                    value={removeData.llmId}
+                    onChange={handleRemoveFormChange}
                     className="w-full p-2 border rounded-md"
                     placeholder="0"
                     required
                   />
+                  <p className="text-sm text-gray-500 mt-1">Use the "Select" button above to fill this automatically</p>
                 </div>
                 <div className="mb-4">
                   <p className="text-sm font-medium text-gray-700">
-                    Selected Pool Balance: {withdrawData.llmId && !isNaN(parseInt(withdrawData.llmId)) && parseInt(withdrawData.llmId) < llmEntries.length 
-                      ? `${ethers.formatEther(llmEntries[parseInt(withdrawData.llmId)].poolBalance)} ETH` 
+                    Selected Pool Balance: {removeData.llmId && !isNaN(parseInt(removeData.llmId)) && 
+                      parseInt(removeData.llmId) < llmEntries.length && llmEntries[parseInt(removeData.llmId)]
+                      ? `${safeFormatEther(llmEntries[parseInt(removeData.llmId)].poolBalance)} ETH` 
                       : "0 ETH"}
                   </p>
+                  {removeData.llmId && !isNaN(parseInt(removeData.llmId)) && 
+                   parseInt(removeData.llmId) < llmEntries.length && llmEntries[parseInt(removeData.llmId)] &&
+                   llmEntries[parseInt(removeData.llmId)].poolBalance.toString() !== '0' && (
+                    <p className="text-sm text-red-600 mt-1">
+                      Warning: Pool balance must be zero to remove this LLM. Withdraw funds first.
+                    </p>
+                  )}
                 </div>
                 <button
                   type="submit"
-                  disabled={isWithdrawing || !withdrawData.llmId || (withdrawData.llmId && !isNaN(parseInt(withdrawData.llmId)) && parseInt(withdrawData.llmId) < llmEntries.length && llmEntries[parseInt(withdrawData.llmId)].poolBalance.toString() === '0')}
-                  className="w-full px-6 py-3 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400"
+                  disabled={
+                    isRemoving || 
+                    !removeData.llmId || 
+                    !llmEntries || 
+                    isNaN(parseInt(removeData.llmId)) || 
+                    parseInt(removeData.llmId) >= llmEntries.length || 
+                    !llmEntries[parseInt(removeData.llmId)] || 
+                    llmEntries[parseInt(removeData.llmId)].poolBalance.toString() !== '0'
+                  }
+                  className="w-full px-6 py-3 bg-pink-600 text-white rounded-md hover:bg-pink-700 disabled:bg-gray-400"
                 >
-                  {isWithdrawing ? 'Withdrawing...' : 'Withdraw & Split Between Owners'}
+                  {isRemoving ? 'Removing...' : 'Remove Hosted LLM'}
                 </button>
               </form>
             </div>
