@@ -11,6 +11,7 @@ import { ethers } from 'ethers';
 import contractABI from '../utils/ABI.json';
 import Dashboard from '../components/Dashboard';
 import Token from '../components/Token';
+import useUseTokens from '../hooks/useUseTokens';
 
 export default function Chat() {
   const [selectedModel, setSelectedModel] = useState(null); 
@@ -130,7 +131,16 @@ export default function Chat() {
     return url;
   };
 
-  // Generate response without token functionality
+  // Add the useUseTokens hook
+  const { 
+    isSpendingTokens, 
+    resultMessage, 
+    spendTokensData, 
+    handleSpendTokensFormChange, 
+    handleSpendTokens 
+  } = useUseTokens(contract, userAddress, fetchTokenBalance);
+
+  // Update the generateResponse function to handle token payments
   const generateResponse = async () => {
     if (!aiChat.inputText.trim()) return;
     if (!selectedModel) {
@@ -149,6 +159,10 @@ export default function Chat() {
       // Clear input using the hook's handleInputChange method
       const emptyEvent = { target: { value: "" } };
       aiChat.handleInputChange(emptyEvent);
+      
+      // Check if selected model is self-hosted
+      const modelIndex = parseInt(selectedModel.split('-')[1]);
+      const isModelSelfHosted = llmEntries[modelIndex] && isOwnedByUser(llmEntries[modelIndex]);
       
       // Call our proxy API route to get the AI response
       const responsePending = fetch("/api/tee-proxy", {
@@ -190,8 +204,43 @@ export default function Chat() {
       // Extract the response from the output field
       const aiResponse = data.output;
       
-      // Add the response WITHOUT attestation quotes
-      aiChat.addMessage("assistant", aiResponse, 0);
+      // For non-self-hosted models, calculate and charge tokens
+      if (!isModelSelfHosted) {
+        // Calculate tokens based on character count of input and output
+        const totalCharacters = userInput.length + aiResponse.length;
+        
+        // Check if the user has enough tokens
+        if (parseInt(tokenBalance) < totalCharacters) {
+          aiChat.addMessage("system", 
+            `Insufficient tokens: This response requires ${totalCharacters} tokens, but you only have ${tokenBalance}. 
+             Please purchase more tokens to view the response.`, 0);
+          return;
+        }
+        
+        try {
+          // Update spendTokensData with the correct token amount
+          spendTokensData.tokenAmount = totalCharacters.toString();
+          
+          // Call the smart contract to spend tokens directly without confirmation
+          const tx = await contract.useTokens(totalCharacters);
+          await tx.wait();
+          
+          // Update token balance
+          fetchTokenBalance();
+          
+          // Now that payment is confirmed, add the AI response
+          aiChat.addMessage("assistant", aiResponse, totalCharacters);
+        } catch (error) {
+          console.error("Error spending tokens:", error);
+          aiChat.addMessage("system", 
+            `Error processing token payment: ${error.message}. 
+             The response has been generated but cannot be displayed.`, 0);
+          return;
+        }
+      } else {
+        // For self-hosted models, add the response without charging tokens
+        aiChat.addMessage("assistant", aiResponse, 0);
+      }
       
       // Extract Node2 attestation directly from the tee-proxy response
       try {
