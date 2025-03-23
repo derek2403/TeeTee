@@ -13,7 +13,7 @@ import Dashboard from '../components/Dashboard';
 import Token from '../components/Token';
 
 export default function Chat() {
-  const [selectedModel, setSelectedModel] = useState('llm-0'); 
+  const [selectedModel, setSelectedModel] = useState(null); 
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
   const [contract, setContract] = useState(null);
@@ -133,6 +133,11 @@ export default function Chat() {
   // Generate response without token functionality
   const generateResponse = async () => {
     if (!aiChat.inputText.trim()) return;
+    if (!selectedModel) {
+      // Alert the user to select a model
+      alert("Please select a model before sending a message");
+      return;
+    }
     
     try {
       // Store the user input before adding to messages
@@ -247,6 +252,10 @@ export default function Chat() {
   // Add this handler for the Enter key
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey && aiChat.inputText.trim() && !aiChat.isGenerating) {
+      if (!selectedModel) {
+        alert("Please select a model before sending a message");
+        return;
+      }
       e.preventDefault();
       generateResponse();
     }
@@ -477,7 +486,7 @@ export default function Chat() {
               />
               <Button
                 color="primary"
-                disabled={!aiChat.inputText.trim() || aiChat.isGenerating}
+                disabled={!aiChat.inputText.trim() || aiChat.isGenerating || !selectedModel}
                 onClick={generateResponse}
                 radius="lg"
                 isIconOnly
