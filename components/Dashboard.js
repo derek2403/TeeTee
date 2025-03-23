@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Card, CardHeader, CardBody } from "@heroui/card";
 import { Button } from "@heroui/button";
 import { ethers } from 'ethers';
@@ -6,6 +6,24 @@ import { ethers } from 'ethers';
 const Dashboard = ({ tokenBalance, aiChat, onClose, contract, llmEntries = [], userAddress }) => {
   const [totalEarnings, setTotalEarnings] = useState("0");
   const [networkUptime, setNetworkUptime] = useState("99.8%");
+  const dashboardRef = useRef(null);
+  
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dashboardRef.current && !dashboardRef.current.contains(event.target)) {
+        onClose();
+      }
+    };
+    
+    // Add event listener
+    document.addEventListener("mousedown", handleClickOutside);
+    
+    // Cleanup event listener
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [onClose]);
   
   // Calculate earnings (poolBalance/2) from models owned by the user
   useEffect(() => {
@@ -36,7 +54,7 @@ const Dashboard = ({ tokenBalance, aiChat, onClose, contract, llmEntries = [], u
   ).length;
   
   return (
-    <div className="flex flex-col w-full space-y-4 pb-4">
+    <div ref={dashboardRef} className="flex flex-col w-full space-y-4 pb-4">
       {/* User Profile Section */}
       <div className="p-4 bg-gray-50 rounded-lg">
         <div className="flex items-center space-x-4">
