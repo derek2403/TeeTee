@@ -3,6 +3,7 @@ import { Button } from "@heroui/button";
 import { Tabs, Tab } from "@heroui/tabs";
 import { CgCopy } from "react-icons/cg";
 import { useRouter } from 'next/router';
+import { FaExternalLinkAlt } from 'react-icons/fa';
 
 export default function InstructionsModal({ isOpen, onClose, model }) {
   const router = useRouter();
@@ -98,6 +99,12 @@ export default async function handler(req, res) {
     window.location.href = `/ContributionPool?model=${model.id}`;
   };
 
+  // Handle opening links in a new tab
+  const openInNewTab = (url) => {
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <Modal 
       isOpen={isOpen} 
@@ -138,14 +145,28 @@ export default async function handler(req, res) {
               <p className="text-sm mb-4">
                 Below are example code snippets for using this model. The model endpoint URL is:
               </p>
-              <div className="bg-gray-100 p-2 rounded break-all mb-4 relative">
+              <div className="bg-gray-100 p-2 rounded break-all mb-4 relative flex items-center justify-between">
                 <code className="text-sm">{model.nodeURL}</code>
-                <button 
-                  className="ml-2 text-gray-500 hover:text-gray-700" 
-                  onClick={() => navigator.clipboard.writeText(model.nodeURL)}
-                >
-                  <CgCopy size={18} />
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button 
+                    className="text-gray-500 hover:text-gray-700" 
+                    onClick={() => {
+                      navigator.clipboard.writeText(model.nodeURL);
+                      // Show a brief tooltip that the URL was copied
+                      alert("URL copied to clipboard!");
+                    }}
+                    title="Copy to clipboard"
+                  >
+                    <CgCopy size={18} />
+                  </button>
+                  <button 
+                    className="text-blue-500 hover:text-blue-700" 
+                    onClick={() => openInNewTab(model.nodeURL)}
+                    title="Open in new tab"
+                  >
+                    <FaExternalLinkAlt size={14} />
+                  </button>
+                </div>
               </div>
               
               <Tabs aria-label="Code examples" variant="underlined">
@@ -205,8 +226,30 @@ export default async function handler(req, res) {
               <div className="mt-4 p-3 bg-blue-50 rounded-md text-sm text-blue-800">
                 <h5 className="font-medium mb-1">Model Information</h5>
                 <ul className="list-disc pl-5 space-y-1">
-                  <li>Model URL: <a href={model.modelUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{model.modelUrl}</a></li>
-                  <li>Node URL: {model.nodeURL}</li>
+                  <li>
+                    Model URL: 
+                    <a 
+                      href={model.modelUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-blue-600 hover:underline ml-1 inline-flex items-center"
+                    >
+                      {model.modelUrl}
+                      <FaExternalLinkAlt size={12} className="ml-1" />
+                    </a>
+                  </li>
+                  <li>
+                    Node URL: 
+                    <a 
+                      href={model.nodeURL} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-blue-600 hover:underline ml-1 inline-flex items-center"
+                    >
+                      {model.nodeURL}
+                      <FaExternalLinkAlt size={12} className="ml-1" />
+                    </a>
+                  </li>
                   <li>Number of Nodes: {model.numberOfNodes}</li>
                   <li>Active Nodes: {model.hostAddresses.length}</li>
                 </ul>

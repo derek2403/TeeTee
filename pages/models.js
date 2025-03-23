@@ -133,6 +133,15 @@ export default function Models() {
     
     // Use the same metadata for all entries
     return llmEntries.map((llmEntry, index) => {
+      // Filter valid addresses
+      const validAddresses = [
+        llmEntry.owner1 !== "0x0000000000000000000000000000000000000001" ? llmEntry.owner1 : null,
+        llmEntry.owner2 !== "0x0000000000000000000000000000000000000001" ? llmEntry.owner2 : null
+      ].filter(Boolean);
+      
+      // Use the URL directly from the blockchain data
+      const nodeURL = llmEntry.url;
+        
       return {
         id: index,
         name: modelMetadata.name,
@@ -140,12 +149,10 @@ export default function Models() {
         owner1: llmEntry.owner1,
         owner2: llmEntry.owner2,
         url: llmEntry.url,
+        modelUrl: `https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0`, // Default model URL
+        nodeURL: nodeURL, // Use the URL from blockchain directly
         poolBalance: llmEntry.poolBalance,
-        // Calculate number of valid addresses (exclude 0x0000000000000000000000000000000000000001)
-        hostAddresses: [
-          llmEntry.owner1 !== "0x0000000000000000000000000000000000000001" ? llmEntry.owner1 : null,
-          llmEntry.owner2 !== "0x0000000000000000000000000000000000000001" ? llmEntry.owner2 : null
-        ].filter(Boolean),
+        hostAddresses: validAddresses,
         numberOfNodes: 2 // Fixed at 2 since the contract has owner1 and owner2
       };
     });
@@ -237,10 +244,10 @@ export default function Models() {
               <a href="#" className="text-blue-600 ml-1">Learn more</a>.
             </p>
           </div>
-         
+        
         </div>
 
-       
+      
         
         {/* Loading state */}
         {loading && (
@@ -301,13 +308,8 @@ export default function Models() {
                             </div>
                           )}
                         </div>
+                     
                         
-                        {/* Pool balance */}
-                        <div className="mt-2">
-                          <p className="text-xs text-gray-500">
-                            Pool Balance: {safeFormatEther(model.poolBalance)} ETH
-                          </p>
-                        </div>
                       </div>
                     </div>
                     
