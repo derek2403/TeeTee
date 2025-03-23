@@ -1,40 +1,62 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import contractABI from '../utils/ABI.json';
+import {
+  useCheckBalance,
+  useCreateHostedLLM,
+  useDepositToPool,
+  useEditHostedLLM,
+  useGetAllHostedLLMs,
+  useUseTokens,
+  useWithdrawFromPool,
+} from '../hooks';
 
 export default function TestPage() {
-  const [amount, setAmount] = useState('0.002');
-  const [tokenBalance, setTokenBalance] = useState('0');
-  const [withdrawAmount, setWithdrawAmount] = useState('0.001');
-  const [tokenUseAmount, setTokenUseAmount] = useState('10');
-  const [userAddress, setUserAddress] = useState('');
-  const [address, setAddress] = useState('');
+  // State variables
   const [isConnected, setIsConnected] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
+  const [address, setAddress] = useState('');
+  const [isContractOwner, setIsContractOwner] = useState(false);
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
   const [contract, setContract] = useState(null);
-  const [poolBalance, setPoolBalance] = useState(null);
-  const [isPurchasing, setIsPurchasing] = useState(false);
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
-  const [isUsingTokens, setIsUsingTokens] = useState(false);
-  const [purchaseSuccess, setPurchaseSuccess] = useState(false);
-  const [withdrawSuccess, setWithdrawSuccess] = useState(false);
-  const [useTokensSuccess, setUseTokensSuccess] = useState(false);
+  const [resultMessage, setResultMessage] = useState('');
   
-  // LLM Simulation States
-  const [inputText, setInputText] = useState('');
-  const [outputText, setOutputText] = useState('');
-  const [simulationTokens, setSimulationTokens] = useState(0);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [hasAvailableTokens, setHasAvailableTokens] = useState(true);
-  const [tokenUsageHistory, setTokenUsageHistory] = useState([]);
-  const [pendingOutputSignature, setPendingOutputSignature] = useState(false);
-  const [pendingOutputCost, setPendingOutputCost] = useState(0);
-  const [mockResponse, setMockResponse] = useState('');
-  const [isSigningOutput, setIsSigningOutput] = useState(false);
+  // Contract address - adjust this to match your deployed contract
+  const contractAddress = '0x4785815a0CBA353484D566029471Fa2E4C596a3a';
   
-  const contractAddress = '0x2ABf94cB5B0cA6e00f85F77Cc88a17204f511BE7';
+  // Custom hooks
+  const { tokenBalance, fetchTokenBalance } = useCheckBalance(contract);
+  const { llmEntries, totalLLMs, fetchLLMEntries } = useGetAllHostedLLMs(contract);
+  const { 
+    isCreatingLLM, 
+    newLLMData, 
+    handleCreateLLMFormChange, 
+    handleCreateLLM 
+  } = useCreateHostedLLM(contract, address, fetchLLMEntries);
+  const { 
+    isEditingLLM, 
+    editLLMData, 
+    handleEditLLMFormChange, 
+    handleEditLLM 
+  } = useEditHostedLLM(contract, address, fetchLLMEntries);
+  const { 
+    isDepositing, 
+    depositData, 
+    handleDepositFormChange, 
+    handleDeposit 
+  } = useDepositToPool(contract, fetchTokenBalance);
+  const { 
+    isWithdrawing, 
+    withdrawData, 
+    handleWithdrawFormChange, 
+    handleWithdraw 
+  } = useWithdrawFromPool(contract, llmEntries, fetchLLMEntries);
+  const { 
+    isSpendingTokens, 
+    spendTokensData, 
+    handleSpendTokensFormChange, 
+    handleSpendTokens 
+  } = useUseTokens(contract, address, fetchTokenBalance);
   
   // Connect wallet
   const connectWallet = async () => {
@@ -51,13 +73,9 @@ export default function TestPage() {
         setAddress(accounts[0]);
         setIsConnected(true);
         
-        // Check if connected user is owner
-        const ownerAddress = await contract.owner();
-        setIsOwner(accounts[0].toLowerCase() === ownerAddress.toLowerCase());
-        
-        // Initial data fetching
-        fetchTokenBalance(accounts[0], contract);
-        fetchPoolBalance(contract);
+        // Check if connected user is contract owner
+        const ownerAddress = await contract.contractOwner();
+        setIsContractOwner(accounts[0].toLowerCase() === ownerAddress.toLowerCase());
         
         // Setup listeners for account changes
         window.ethereum.on("accountsChanged", handleAccountsChanged);
@@ -75,291 +93,25 @@ export default function TestPage() {
       // User disconnected wallet
       setIsConnected(false);
       setAddress('');
-      setIsOwner(false);
+      setIsContractOwner(false);
     } else {
       // User switched account
       setAddress(accounts[0]);
       if (contract) {
-        const ownerAddress = await contract.owner();
-        setIsOwner(accounts[0].toLowerCase() === ownerAddress.toLowerCase());
-        fetchTokenBalance(accounts[0], contract);
+        const ownerAddress = await contract.contractOwner();
+        setIsContractOwner(accounts[0].toLowerCase() === ownerAddress.toLowerCase());
+        // Update token balance for new account
+        fetchTokenBalance();
       }
     }
   };
   
-  // Fetch token balance
-  const fetchTokenBalance = async (userAddress, contractInstance) => {
-    try {
-      if (!contractInstance) return;
-      
-      // Try using checkBalance first
-      try {
-        const balance = await contractInstance.checkBalance();
-        setTokenBalance(balance.toString());
-        // Check if user has available tokens for simulation
-        setHasAvailableTokens(parseInt(balance.toString()) > 0);
-        setSimulationTokens(parseInt(balance.toString()));
-      } catch (error) {
-        // Fallback to mapping
-        const balance = await contractInstance.tokenBalances(userAddress);
-        setTokenBalance(balance.toString());
-        // Check if user has available tokens for simulation
-        setHasAvailableTokens(parseInt(balance.toString()) > 0);
-        setSimulationTokens(parseInt(balance.toString()));
-      }
-    } catch (error) {
-      console.error("Error fetching token balance:", error);
-    }
-  };
-  
-  // Fetch pool balance
-  const fetchPoolBalance = async (contractInstance) => {
-    try {
-      if (!contractInstance) return;
-      
-      const balance = await contractInstance.totalPoolBalance();
-      setPoolBalance(balance);
-    } catch (error) {
-      console.error("Error fetching pool balance:", error);
-    }
-  };
-  
-  // Purchase tokens
-  const handlePurchase = async () => {
-    try {
-      if (!contract) return;
-      
-      setIsPurchasing(true);
-      setPurchaseSuccess(false);
-      
-      const weiAmount = ethers.parseEther(amount);
-      const tx = await contract.purchaseTokens(weiAmount, {
-        value: weiAmount
-      });
-      
-      await tx.wait();
-      
-      setIsPurchasing(false);
-      setPurchaseSuccess(true);
-      
-      // Refresh data
-      fetchTokenBalance(address, contract);
-      fetchPoolBalance(contract);
-      
-      // Reset success message after 5 seconds
-      setTimeout(() => {
-        setPurchaseSuccess(false);
-      }, 5000);
-      
-    } catch (error) {
-      console.error("Purchase error:", error);
-      setIsPurchasing(false);
-    }
-  };
-  
-  // Withdraw funds (owner only)
-  const handleWithdraw = async () => {
-    try {
-      if (!contract || !isOwner) return;
-      
-      setIsWithdrawing(true);
-      setWithdrawSuccess(false);
-      
-      const weiAmount = ethers.parseEther(withdrawAmount);
-      const tx = await contract.withdrawPool(weiAmount);
-      
-      await tx.wait();
-      
-      setIsWithdrawing(false);
-      setWithdrawSuccess(true);
-      
-      // Refresh data
-      fetchPoolBalance(contract);
-      
-      // Reset success message after 5 seconds
-      setTimeout(() => {
-        setWithdrawSuccess(false);
-      }, 5000);
-      
-    } catch (error) {
-      console.error("Withdraw error:", error);
-      setIsWithdrawing(false);
-    }
-  };
-  
-  // Use tokens (owner only)
-  const handleUseTokens = async () => {
-    try {
-      if (!contract || !isOwner) return;
-      
-      setIsUsingTokens(true);
-      setUseTokensSuccess(false);
-      
-      const tx = await contract.useTokens(userAddress, tokenUseAmount);
-      
-      await tx.wait();
-      
-      setIsUsingTokens(false);
-      setUseTokensSuccess(true);
-      
-      // Reset success message after 5 seconds
-      setTimeout(() => {
-        setUseTokensSuccess(false);
-      }, 5000);
-      
-    } catch (error) {
-      console.error("Use tokens error:", error);
-      setIsUsingTokens(false);
-    }
-  };
-  
-  // LLM Simulation - Handle input change
-  const handleInputChange = (e) => {
-    setInputText(e.target.value);
-  };
-  
-  // LLM Simulation - Generate response and sign input transaction
-  const generateResponse = async () => {
-    if (!inputText.trim() || !hasAvailableTokens) return;
-    
-    const inputTokenCost = inputText.length; // Simplified: 1 character = 1 token
-    
-    // Check if user has enough tokens
-    if (simulationTokens < inputTokenCost) {
-      alert(`Not enough tokens. Input requires ${inputTokenCost} tokens but you only have ${simulationTokens}.`);
-      return;
-    }
-    
-    // Start generating - this immediately signs the input transaction
-    setIsGenerating(true);
-    
-    // Deduct input tokens immediately (as if transaction was signed)
-    const remainingTokens = simulationTokens - inputTokenCost;
-    setSimulationTokens(remainingTokens);
-    
-    // Add to usage history
-    setTokenUsageHistory(prev => [...prev, {
-      type: 'Input (signed)',
-      text: inputText,
-      tokens: inputTokenCost,
-      remaining: remainingTokens
-    }]);
-    
-    // Simulate transaction for input tokens
-    if (contract && address) {
-      try {
-        await handleSimulatedTokenUsage(inputTokenCost);
-      } catch (error) {
-        console.error("Error handling input token usage:", error);
-        setIsGenerating(false);
-        return;
-      }
-    }
-    
-    const savedInput = inputText; // Save input before clearing
-    setInputText(''); // Clear input for next interaction
-    
-    // Generate mock response with setTimeout to simulate delay
-    setTimeout(() => {
-      // Simple mock response that's roughly 2x the length of input
-      const response = `This is a simulation of an LLM response to: "${savedInput}". 
-      
-In a real LLM integration, this would be where the actual API response appears. For this simulation, we're just generating dummy text that's approximately twice the length of your input to demonstrate how token usage works.
-
-The important concept here is that both your input and the generated output consume tokens from your balance. In a production system, the token calculation would be more sophisticated than just counting characters.`;
-      
-      const outputTokenCost = response.length; // Simplified: 1 character = 1 token
-      
-      // Check if user has enough tokens for output
-      if (remainingTokens < outputTokenCost) {
-        // Not enough tokens for full response - need to truncate
-        const truncatedResponse = response.substring(0, remainingTokens);
-        setMockResponse(truncatedResponse + "... [Response truncated due to insufficient tokens]");
-        setPendingOutputCost(remainingTokens); // Charge only what's available
-      } else {
-        // Enough tokens for full response
-        setMockResponse(response);
-        setPendingOutputCost(outputTokenCost);
-      }
-      
-      setIsGenerating(false);
-      setPendingOutputSignature(true);
-    }, 1500); // 1.5 second delay to simulate processing
-  };
-  
-  // LLM Simulation - Sign the output transaction
-  const signOutputTransaction = async () => {
-    if (!pendingOutputSignature || pendingOutputCost <= 0) return;
-    
-    setIsSigningOutput(true);
-    
-    // Deduct output tokens upon signature
-    const finalTokens = simulationTokens - pendingOutputCost;
-    setSimulationTokens(finalTokens);
-    setHasAvailableTokens(finalTokens > 0);
-    
-    // Add to usage history
-    setTokenUsageHistory(prev => [...prev, {
-      type: 'Output (signed)',
-      text: mockResponse,
-      tokens: pendingOutputCost,
-      remaining: finalTokens
-    }]);
-    
-    // Simulate transaction for output tokens
-    if (contract && address) {
-      try {
-        await handleSimulatedTokenUsage(pendingOutputCost);
-      } catch (error) {
-        console.error("Error handling output token usage:", error);
-      }
-    }
-    
-    // Show the output
-    setOutputText(mockResponse);
-    
-    // Reset pending states
-    setPendingOutputSignature(false);
-    setIsSigningOutput(false);
-    setPendingOutputCost(0);
-  };
-  
-  // LLM Simulation - Deduct tokens from contract
-  const handleSimulatedTokenUsage = async (tokenAmount) => {
-    try {
-      if (isOwner && contract) {
-        // If the connected user is the owner, execute the useTokens function
-        // This is simplified - in a real application you'd likely have a backend service do this
-        const tx = await contract.useTokens(address, tokenAmount);
-        await tx.wait();
-        
-        // Update token balance
-        fetchTokenBalance(address, contract);
-      } else {
-        // In a real app, this would be an API call to your backend
-        console.log(`Simulation: ${tokenAmount} tokens used from user ${address}`);
-        // For the demo, we manually update the display values
-        const newBalance = Math.max(0, parseInt(tokenBalance) - tokenAmount);
-        setTokenBalance(newBalance.toString());
-      }
-    } catch (error) {
-      console.error("Error handling simulated token usage:", error);
-    }
-  };
-  
-  // Reset the simulation
-  const resetSimulation = () => {
-    setOutputText('');
-    setInputText('');
-    setTokenUsageHistory([]);
-    setIsSigningOutput(false);
-    setPendingOutputSignature(false);
-    setPendingOutputCost(0);
-    setMockResponse('');
-    // Refresh token balance to sync with actual contract state
-    if (contract && address) {
-      fetchTokenBalance(address, contract);
-    }
+  // Fill edit form with selected LLM data
+  const handleSelectLLM = (index) => {
+    // Set LLM ID for edit, deposit, and withdraw forms
+    handleEditLLMFormChange({ target: { name: 'llmId', value: index.toString() } });
+    handleDepositFormChange({ target: { name: 'llmId', value: index.toString() } });
+    handleWithdrawFormChange({ target: { name: 'llmId', value: index.toString() } });
   };
   
   // Init effect - check if wallet already connected
@@ -388,11 +140,35 @@ The important concept here is that both your input and the generated output cons
       }
     };
   }, []);
+  
+  // Effect to fetch initial data when connected
+  useEffect(() => {
+    if (isConnected && contract) {
+      fetchLLMEntries();
+      fetchTokenBalance();
+    }
+  }, [isConnected, contract]);
+  
+  // Set global result message by watching hook messages
+  useEffect(() => {
+    // Priority order for messages
+    if (isCreatingLLM.resultMessage) setResultMessage(isCreatingLLM.resultMessage);
+    else if (isEditingLLM.resultMessage) setResultMessage(isEditingLLM.resultMessage);
+    else if (isDepositing.resultMessage) setResultMessage(isDepositing.resultMessage);
+    else if (isWithdrawing.resultMessage) setResultMessage(isWithdrawing.resultMessage);
+    else if (isSpendingTokens.resultMessage) setResultMessage(isSpendingTokens.resultMessage);
+  }, [
+    isCreatingLLM.resultMessage,
+    isEditingLLM.resultMessage,
+    isDepositing.resultMessage,
+    isWithdrawing.resultMessage,
+    isSpendingTokens.resultMessage
+  ]);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto p-6 mt-8 bg-white rounded-lg shadow-md">
-        <h1 className="text-3xl font-bold mb-6">Test Smart Contract</h1>
+      <div className="max-w-6xl mx-auto p-6 mt-8 bg-white rounded-lg shadow-md">
+        <h1 className="text-3xl font-bold mb-6">HostedLLM Contract Tester</h1>
         
         {!isConnected ? (
           <div className="p-8 text-center">
@@ -406,194 +182,345 @@ The important concept here is that both your input and the generated output cons
           </div>
         ) : (
           <div className="space-y-8">
-            <div className="p-4 border rounded-lg">
-              <h2 className="text-xl font-semibold mb-4">Your Token Balance</h2>
-              <p className="text-2xl font-bold">{tokenBalance} Tokens</p>
-            </div>
-            
-            {/* LLM Simulation Section */}
-            <div className="p-4 border rounded-lg">
-              <h2 className="text-xl font-semibold mb-4">LLM Token Usage Simulation</h2>
-              <p className="mb-4 text-sm text-gray-600">
-                This simulates how tokens would be used in an LLM interaction. 
-                For simplicity, 1 character = 1 token. Both input and output consume tokens.
-              </p>
-              
-              <div className="p-3 bg-gray-100 rounded-md mb-4">
-                <p className="font-medium mb-2">Simulation Token Balance: {simulationTokens}</p>
-                {tokenUsageHistory.length > 0 && (
-                  <div className="text-xs text-gray-600 space-y-1 max-h-32 overflow-y-auto">
-                    <p className="font-medium">Usage History:</p>
-                    {tokenUsageHistory.map((entry, index) => (
-                      <div key={index} className="flex justify-between">
-                        <span>{entry.type}: {entry.tokens} tokens</span>
-                        <span>Remaining: {entry.remaining}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+            <div className="p-4 border rounded-lg bg-blue-50">
+              <h2 className="text-xl font-semibold mb-2">Connected Wallet</h2>
+              <p className="font-mono">{address}</p>
+              <div className="mt-2 bg-blue-100 p-2 rounded-md text-blue-800">
+                <p className="font-semibold">Your Token Balance: {tokenBalance} tokens</p>
               </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Input (each character counts as 1 token)
-                  </label>
-                  <textarea
-                    value={inputText}
-                    onChange={handleInputChange}
-                    placeholder="Type your input here..."
-                    disabled={!hasAvailableTokens || isGenerating || pendingOutputSignature || isSigningOutput}
-                    className="w-full p-2 border rounded-md h-24"
-                  />
-                  <p className="text-sm text-gray-600 mt-1">
-                    This input will cost approximately {inputText.length} tokens (signs automatically on submission)
-                  </p>
-                </div>
-                
-                <div className="flex justify-between">
-                  {!pendingOutputSignature ? (
-                    <button
-                      onClick={generateResponse}
-                      disabled={!inputText.trim() || !hasAvailableTokens || isGenerating || isSigningOutput}
-                      className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
-                    >
-                      {isGenerating ? 'Signing & Processing...' : 'Submit Query'}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={signOutputTransaction}
-                      className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 animate-pulse"
-                    >
-                      Sign Transaction for Output ({pendingOutputCost} tokens)
-                    </button>
-                  )}
-                  
-                  <button
-                    onClick={resetSimulation}
-                    className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                  >
-                    Reset Simulation
-                  </button>
-                </div>
-                
-                {/* Transaction signing information */}
-                {isGenerating && (
-                  <div className="p-3 bg-blue-100 text-blue-800 rounded-md">
-                    <p className="font-medium">Generating Response</p>
-                    <p>Your input has been signed and processed. Generating response...</p>
-                  </div>
-                )}
-                
-                {pendingOutputSignature && (
-                  <div className="p-3 bg-purple-100 text-purple-800 rounded-md">
-                    <p className="font-medium">Review Generated Response</p>
-                    <div className="max-h-32 overflow-y-auto mt-2 p-2 bg-white rounded border">
-                      <p className="whitespace-pre-line">{mockResponse}</p>
-                    </div>
-                    <p className="mt-2">To receive this output, please sign a transaction for {pendingOutputCost} tokens.</p>
-                  </div>
-                )}
-                
-                {outputText && !pendingOutputSignature && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Final Output
-                    </label>
-                    <div className="w-full p-4 border rounded-md bg-gray-50 whitespace-pre-line">
-                      {outputText}
-                    </div>
-                  </div>
-                )}
-                
-                {!hasAvailableTokens && (
-                  <div className="p-3 bg-yellow-100 text-yellow-800 rounded-md">
-                    <p className="font-medium">Out of tokens!</p>
-                    <p>Purchase more tokens to continue using the LLM service.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="p-4 border rounded-lg">
-              <h2 className="text-xl font-semibold mb-4">Purchase Tokens</h2>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-grow">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ETH Amount (min 0.002)
-                  </label>
-                  <input
-                    type="number"
-                    min="0.002"
-                    step="0.001"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="w-full p-2 border rounded-md"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <button
-                    onClick={handlePurchase}
-                    disabled={isPurchasing || !amount}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
-                  >
-                    {isPurchasing ? 'Processing...' : 'Purchase'}
-                  </button>
-                </div>
-              </div>
-              {purchaseSuccess && (
-                <div className="mt-3 p-3 bg-green-100 text-green-800 rounded-md">
-                  Transaction successful! Your tokens have been purchased.
-                </div>
+              {isContractOwner && (
+                <p className="mt-2 bg-green-100 p-2 rounded-md text-green-800">
+                  You are the contract owner.
+                </p>
               )}
             </div>
             
-            {poolBalance && (
-              <div className="p-4 border rounded-lg">
-                <h2 className="text-xl font-semibold mb-4">Total Pool Balance</h2>
-                <p className="text-2xl font-bold">{ethers.formatEther(poolBalance)} ETH</p>
+            {resultMessage && (
+              <div className={`p-4 rounded-md ${
+                resultMessage.includes('Error') ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+              }`}>
+                {resultMessage}
               </div>
             )}
             
-            {/* Owner-only functions */}
-            {isOwner && (
-              <div className="space-y-6 p-4 border rounded-lg bg-yellow-50">
-                <h2 className="text-xl font-semibold">Owner Functions</h2>
-                
-                <div className="p-4 border rounded-lg bg-white">
-                  <h3 className="text-lg font-medium mb-3">Withdraw Funds</h3>
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-grow">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        ETH Amount
-                      </label>
-                      <input
-                        type="number"
-                        min="0.001"
-                        step="0.001"
-                        value={withdrawAmount}
-                        onChange={(e) => setWithdrawAmount(e.target.value)}
-                        className="w-full p-2 border rounded-md"
-                      />
-                    </div>
-                    <div className="flex items-end">
-                      <button
-                        onClick={handleWithdraw}
-                        disabled={isWithdrawing}
-                        className="px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:bg-gray-400"
-                      >
-                        {isWithdrawing ? 'Processing...' : 'Withdraw'}
-                      </button>
-                    </div>
-                  </div>
-                  {withdrawSuccess && (
-                    <div className="mt-3 p-3 bg-green-100 text-green-800 rounded-md">
-                      Withdrawal successful!
-                    </div>
-                  )}
+            <div className="p-4 border rounded-lg">
+              <h2 className="text-xl font-semibold mb-4">Hosted LLM Entries (Total: {totalLLMs})</h2>
+              
+              {llmEntries.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner 1</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner 2</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pool Balance</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {llmEntries.map((llm, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{index}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {llm.name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {llm.description && llm.description.length > 30 
+                              ? `${llm.description.substring(0, 30)}...` 
+                              : llm.description}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                            {llm.owner1.substring(0, 8)}...{llm.owner1.substring(llm.owner1.length - 6)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                            {llm.owner2.substring(0, 8)}...{llm.owner2.substring(llm.owner2.length - 6)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {ethers.formatEther(llm.price)} ETH
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {ethers.formatEther(llm.poolBalance)} ETH
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <button 
+                              onClick={() => handleSelectLLM(index)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                            >
+                              Select
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-gray-500">No LLM entries found. Create one below.</p>
+              )}
+            </div>
+            
+            {/* User Deposit Section */}
+            <div className="p-4 border rounded-lg bg-purple-50">
+              <h2 className="text-xl font-semibold mb-4">Purchase Tokens</h2>
+              <p className="text-sm text-gray-600 mb-3">Deposit ETH to purchase tokens. For every 0.002 ETH, you'll receive 100,000 tokens.</p>
+              <form onSubmit={(e) => { e.preventDefault(); handleDeposit(); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount (ETH, min 0.002)</label>
+                  <input
+                    type="number"
+                    name="amount"
+                    value={depositData.amount}
+                    onChange={handleDepositFormChange}
+                    step="0.001"
+                    min="0.002"
+                    className="w-full p-2 border rounded-md"
+                    required
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    You'll receive approximately {depositData.amount && !isNaN(parseFloat(depositData.amount)) ? 
+                      Math.floor((parseFloat(depositData.amount) / 0.002) * 100000) : 0} tokens
+                  </p>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isDepositing}
+                  className="w-full px-6 py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-400"
+                >
+                  {isDepositing ? 'Processing...' : 'Deposit & Get Tokens'}
+                </button>
+              </form>
+            </div>
+            
+            {/* User Spend Tokens Section */}
+            <div className="p-4 border rounded-lg bg-teal-50">
+              <h2 className="text-xl font-semibold mb-4">Use Your Tokens</h2>
+              <p className="text-sm text-gray-600 mb-3">Spend your tokens to use LLM services.</p>
+              <form onSubmit={(e) => { e.preventDefault(); handleSpendTokens(); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Token Amount to Use</label>
+                  <input
+                    type="number"
+                    name="tokenAmount"
+                    value={spendTokensData.tokenAmount}
+                    onChange={handleSpendTokensFormChange}
+                    className="w-full p-2 border rounded-md"
+                    min="1"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSpendingTokens || parseInt(tokenBalance) <= 0}
+                  className="w-full px-6 py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400"
+                >
+                  {isSpendingTokens ? 'Processing...' : 'Use Tokens'}
+                </button>
+                {parseInt(tokenBalance) <= 0 && (
+                  <p className="text-sm text-red-600 mt-1">
+                    You don't have enough tokens. Purchase some above.
+                  </p>
+                )}
+              </form>
+            </div>
+            
+            {/* Create LLM Form */}
+            <div className="p-4 border rounded-lg bg-green-50">
+              <h2 className="text-xl font-semibold mb-4">Create New Hosted LLM</h2>
+              <form onSubmit={(e) => { e.preventDefault(); handleCreateLLM(); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={newLLMData.name}
+                    onChange={handleCreateLLMFormChange}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="LLM Name"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    name="description"
+                    value={newLLMData.description}
+                    onChange={handleCreateLLMFormChange}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="LLM Description"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Owner 1 Address</label>
+                    <input
+                      type="text"
+                      name="owner1"
+                      value={newLLMData.owner1}
+                      onChange={handleCreateLLMFormChange}
+                      className="w-full p-2 border rounded-md"
+                      placeholder={address}
+                    />
+                    <p className="text-sm text-gray-500 mt-1">Leave blank to use your address</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Owner 2 Address</label>
+                    <input
+                      type="text"
+                      name="owner2"
+                      value={newLLMData.owner2}
+                      onChange={handleCreateLLMFormChange}
+                      className="w-full p-2 border rounded-md"
+                      placeholder={address}
+                    />
+                    <p className="text-sm text-gray-500 mt-1">Leave blank to use your address</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Price (ETH)</label>
+                  <input
+                    type="number"
+                    name="price"
+                    value={newLLMData.price}
+                    onChange={handleCreateLLMFormChange}
+                    step="0.001"
+                    min="0.001"
+                    className="w-full p-2 border rounded-md"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isCreatingLLM}
+                  className="w-full px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
+                >
+                  {isCreatingLLM ? 'Creating...' : 'Create Hosted LLM'}
+                </button>
+              </form>
+            </div>
+            
+            {/* Edit LLM Form */}
+            <div className="p-4 border rounded-lg bg-yellow-50">
+              <h2 className="text-xl font-semibold mb-4">Edit Hosted LLM</h2>
+              <form onSubmit={(e) => { e.preventDefault(); handleEditLLM(); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">LLM ID</label>
+                  <input
+                    type="number"
+                    name="llmId"
+                    value={editLLMData.llmId}
+                    onChange={handleEditLLMFormChange}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="0"
+                    required
+                  />
+                  <p className="text-sm text-gray-500 mt-1">Use the "Select" button above to fill this automatically</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New Name (optional)</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={editLLMData.name}
+                    onChange={handleEditLLMFormChange}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Leave blank to keep current"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New Description (optional)</label>
+                  <textarea
+                    name="description"
+                    value={editLLMData.description}
+                    onChange={handleEditLLMFormChange}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Leave blank to keep current"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">New Owner 1 (optional)</label>
+                    <input
+                      type="text"
+                      name="owner1"
+                      value={editLLMData.owner1}
+                      onChange={handleEditLLMFormChange}
+                      className="w-full p-2 border rounded-md"
+                      placeholder="Leave blank or enter 0 to keep current"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">New Owner 2 (optional)</label>
+                    <input
+                      type="text"
+                      name="owner2"
+                      value={editLLMData.owner2}
+                      onChange={handleEditLLMFormChange}
+                      className="w-full p-2 border rounded-md"
+                      placeholder="Leave blank or enter 0 to keep current"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New Price (optional)</label>
+                  <input
+                    type="number"
+                    name="price"
+                    value={editLLMData.price}
+                    onChange={handleEditLLMFormChange}
+                    step="0.001"
+                    min="0.001"
+                    className="w-full p-2 border rounded-md"
+                    placeholder="Leave blank to keep current"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isEditingLLM || !editLLMData.llmId}
+                  className="w-full px-6 py-3 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:bg-gray-400"
+                >
+                  {isEditingLLM ? 'Updating...' : 'Update Hosted LLM'}
+                </button>
+              </form>
+            </div>
+                
+            {/* Withdraw from Pool */}
+            <div className="p-4 border rounded-lg bg-red-50">
+              <h2 className="text-xl font-semibold mb-4">Withdraw from Pool</h2>
+              <p className="text-sm text-gray-600 mb-3">Withdraws the entire ETH balance from the pool and automatically splits it between the two LLM owners.</p>
+              <form onSubmit={(e) => { e.preventDefault(); handleWithdraw(); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">LLM ID</label>
+                  <input
+                    type="number"
+                    name="llmId"
+                    value={withdrawData.llmId}
+                    onChange={handleWithdrawFormChange}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="0"
+                    required
+                  />
+                </div>
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-gray-700">
+                    Selected Pool Balance: {withdrawData.llmId && !isNaN(parseInt(withdrawData.llmId)) && parseInt(withdrawData.llmId) < llmEntries.length 
+                      ? `${ethers.formatEther(llmEntries[parseInt(withdrawData.llmId)].poolBalance)} ETH` 
+                      : "0 ETH"}
+                  </p>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isWithdrawing || !withdrawData.llmId || (withdrawData.llmId && !isNaN(parseInt(withdrawData.llmId)) && parseInt(withdrawData.llmId) < llmEntries.length && llmEntries[parseInt(withdrawData.llmId)].poolBalance.toString() === '0')}
+                  className="w-full px-6 py-3 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400"
+                >
+                  {isWithdrawing ? 'Withdrawing...' : 'Withdraw & Split Between Owners'}
+                </button>
+              </form>
+            </div>
           </div>
         )}
       </div>

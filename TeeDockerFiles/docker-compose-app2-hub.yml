@@ -9,8 +9,6 @@ services:
       - TRANSFORMERS_OFFLINE=0
       - TOKENIZERS_PARALLELISM=false
       - MODEL_SERVER_URL=https://3529-2001-f40-90e-62cd-ace4-d62e-323f-6852.ngrok-free.app
-    volumes:
-      - /var/run/tappd.sock:/var/run/tappd.sock
     restart: on-failure:5
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
