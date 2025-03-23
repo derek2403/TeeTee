@@ -245,47 +245,22 @@ export default function Chat() {
       // Extract Node2 attestation directly from the tee-proxy response
       try {
         console.log("Checking for Node2 attestation in main response...");
-        // Log just a small sample to avoid cluttering the console
-        const dataSample = {...data};
-        if (dataSample.attestation?.ra_report?.quote) {
-          dataSample.attestation.ra_report.quote = dataSample.attestation.ra_report.quote.substring(0, 30) + "...";
-        }
-        console.log("Response structure sample:", JSON.stringify(dataSample, null, 2));
+        console.log("Response structure sample:", JSON.stringify(data, null, 2).substring(0, 500) + "...");
         
-        // Find Node2 attestation in the response using various possible paths
-        let node2Quote = null;
-        
-        if (data.attestation?.ra_report?.quote) {
-          node2Quote = data.attestation.ra_report.quote;
+        if (data.attestation && data.attestation.ra_report && data.attestation.ra_report.quote) {
           console.log("FOUND Node2 quote in data.attestation.ra_report.quote");
-        } else if (data.ra_report?.quote) {
-          node2Quote = data.ra_report.quote;
-          console.log("FOUND Node2 quote in data.ra_report.quote");
-        } else if (data.node2_attestation?.ra_report?.quote) {
-          node2Quote = data.node2_attestation.ra_report.quote;
-          console.log("FOUND Node2 quote in data.node2_attestation.ra_report.quote");
-        } else {
-          console.log("Available fields in response:", Object.keys(data));
-          if (data.attestation) {
-            console.log("Fields in data.attestation:", Object.keys(data.attestation));
-            if (data.attestation.ra_report) {
-              console.log("Fields in data.attestation.ra_report:", Object.keys(data.attestation.ra_report));
-            }
-          }
-        }
-        
-        // Add Node2 attestation as a message if found
-        if (node2Quote) {
-          console.log("Adding Node2 attestation message with quote length:", node2Quote.length);
-          // Force immediate update
-          setTimeout(() => {
-            aiChat.addMessage("node2-attestation", "Node2 Attestation", 0, {
-              node1: "",
-              node2: node2Quote
-            });
-            console.log("Node2 attestation message added to chat");
-            console.log("Current message count:", aiChat.messages.length);
-          }, 100);
+          
+          // Add a separate message for Node2 attestation
+          const quoteLength = data.attestation.ra_report.quote.length;
+          console.log("Adding Node2 attestation message with quote length:", quoteLength);
+          
+          // Store the full attestation, not just the truncated version
+          aiChat.addMessage("node2-attestation", "Node2 Attestation", 0, {
+            node2: data.attestation.ra_report.quote // Store the full quote
+          });
+          
+          console.log("Node2 attestation message added to chat");
+          console.log("Current message count:", aiChat.messages.length);
         } else {
           console.log("No Node2 attestation found in the main response");
         }
@@ -385,10 +360,10 @@ export default function Chat() {
               <SelectItem 
                 key={`llm-${index}`} 
                 value={`llm-${index}`}
-                textValue={`TinyLlama-1.1B-Chat-v1.0 ${isOwnedByUser(llm) ? "(Self Hosted)" : ""}`}
+                textValue={`TinyLlama-1.1B-Chat-v1.0 ${isOwnedByUser(llm) ? "(Self Hosted)" : ""} (#${index + 1})`}
               >
                 <div className="flex flex-col">
-                  <span>TinyLlama-1.1B-Chat-v1.0 {isOwnedByUser(llm) ? "(Self Hosted)" : ""}</span>
+                  <span>TinyLlama-1.1B-Chat-v1.0 {isOwnedByUser(llm) ? "(Self Hosted)" : ""} (#{index + 1})</span>
                   <span className="text-xs text-gray-500">{formatUrlForDisplay(llm.url)}</span>
                 </div>
               </SelectItem>
@@ -471,21 +446,31 @@ export default function Chat() {
                           </div>
                         ) : message.role === 'node2-attestation' ? (
                           <div className="text-xs">
-                            <div className="flex items-center justify-between">
-                              <div className="font-semibold text-green-700 flex items-center">
-                                <span>Node2 Attestation:</span>
-                                <span className="font-mono ml-2 truncate max-w-[200px]">
-                                  {message.attestationQuotes.node2.substring(0, 30)}...
-                                </span>
-                              </div>
-                              <button 
-                                onClick={() => {navigator.clipboard.writeText(message.attestationQuotes.node2)}}
-                                className="p-1 hover:bg-gray-200 rounded ml-2"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                              </button>
+                            <div className="flex flex-col gap-1">
+                              <details className="cursor-pointer">
+                                <summary className="font-medium flex items-center justify-between">
+                                  <div className="flex items-center text-green-700">
+                                    <span>Node2 Attestation</span>
+                                    <span className="font-mono ml-2 truncate max-w-[200px]">
+                                      {message.attestationQuotes.node2.substring(0, 30)}...
+                                    </span>
+                                  </div>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.preventDefault(); // Prevent details from toggling
+                                      navigator.clipboard.writeText(message.attestationQuotes.node2);
+                                    }}
+                                    className="p-1 hover:bg-gray-200 rounded ml-2"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                  </button>
+                                </summary>
+                                <div className="p-2 mt-1 bg-gray-100 rounded overflow-x-auto">
+                                  <p className="font-mono break-all select-all">{message.attestationQuotes.node2}</p>
+                                </div>
+                              </details>
                             </div>
                           </div>
                         ) : (
@@ -494,6 +479,24 @@ export default function Chat() {
                             {message.tokens > 0 && (
                               <div className="mt-1 text-xs opacity-80 text-right">
                                 {message.tokens} tokens
+                              </div>
+                            )}
+                            {message.attestation && (
+                              <div className="mt-2 text-xs text-gray-500">
+                                <div className="flex flex-col gap-1">
+                                  <details className="cursor-pointer">
+                                    <summary className="font-medium">Attestation Node1</summary>
+                                    <div className="p-2 mt-1 bg-gray-100 rounded overflow-x-auto">
+                                      <p className="font-mono break-all select-all">{message.attestation.node1}</p>
+                                    </div>
+                                  </details>
+                                  <details className="cursor-pointer">
+                                    <summary className="font-medium">Attestation Node2</summary>
+                                    <div className="p-2 mt-1 bg-gray-100 rounded overflow-x-auto">
+                                      <p className="font-mono break-all select-all">{message.attestation.node2}</p>
+                                    </div>
+                                  </details>
+                                </div>
                               </div>
                             )}
                           </>

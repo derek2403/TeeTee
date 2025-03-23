@@ -279,7 +279,7 @@ export default function Models() {
                       <div className="flex-1">
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold">{model.name}</h3>
+                            <h3 className="text-lg font-semibold">{model.name} (#{model.id + 1})</h3>
                             <span className="text-xs px-2 py-1 bg-gray-100 rounded">Model</span>
                           </div>
                           

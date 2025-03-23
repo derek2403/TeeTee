@@ -125,19 +125,20 @@ export default function ContributionPool() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-6xl mx-auto my-8">
-        <h1 className="text-3xl font-bold mb-6">Contribution Pool</h1>
+        <h1 className="text-3xl font-bold mb-6 ml-3">Contribution Pool</h1>
         
         {isLoading ? (
           <div className="flex justify-center items-center py-12">
             <p>Loading model information...</p>
           </div>
         ) : (
-          <>
-            <Card shadow="sm" className="w-full mb-8">
+          <div className="flex flex-row gap-6">
+            {/* Left sidebar - Network info */}
+            <Card shadow="sm" className="w-[40%] h-[60vh] flex flex-col p-2">
               <CardHeader>
                 <h2 className="text-xl font-semibold">Join the TeeTee Contribution Network</h2>
               </CardHeader>
-              <CardBody>
+              <CardBody className="flex-grow overflow-auto">
                 <p className="mb-6">
                   Contribute your own TEE resources to our network and get access to the entire distributed system.
                   Ideal for those who can provide computational resources and want to be part of the TEE network.
@@ -155,84 +156,85 @@ export default function ContributionPool() {
               </CardBody>
             </Card>
             
-            {/* Model Selection */}
-            <div className="mb-6">
-              <Select
-                isRequired
-                isDisabled
-                label="Select a model to contribute"
-                placeholder="Choose LLM model" 
-                aria-label="Select a model to contribute"
-                className="max-w-md"
-                classNames={{
-                  trigger: "border-blue-500 rounded-lg h-12",
-                  label: "text-sm text-gray-700",
-                  base: "max-w-md",
-                  value: "text-sm font-medium",
-                }}
-                defaultSelectedKeys={["tinyllama"]}
-                renderValue={(items) => {
-                  return items.map(item => (
-                    <div key={item.key} className="text-sm">
-                      {item.props.children}
-                    </div>
-                  ));
-                }}
-              >
-                <SelectItem key="tinyllama">TinyLlama-1.1B-Chat-v1.0 (2 TEE Nodes)</SelectItem>
-              </Select>
-              <p className="text-sm text-gray-600 mt-2">
-                More models will be available soon. Currently only TinyLlama-1.1B-Chat-v1.0 is supported.
-              </p>
-            </div>
-            
-            {/* TEE Nodes Visualization */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-4">Available TEE Nodes</h2>
-              <div className="flex justify-center gap-8">
-                {teeNodes.map((node) => (
-                  <Card 
-                    key={node.id} 
-                    className={`border-2 ${node.status === 'occupied' ? 'border-blue-400' : 'border-dashed border-gray-300'} w-full max-w-xs`}
-                    shadow="sm"
-                  >
-                    <CardBody className="p-4">
-                      <div className="aspect-square flex flex-col items-center justify-center text-center p-3">
-                        <div className="w-16 h-16 mb-3 rounded-lg bg-blue-100 flex items-center justify-center">
-                          <span className="text-2xl font-bold text-blue-600">#{node.id}</span>
-                        </div>
-                        
-                        <h3 className="text-lg font-medium mb-1">TEE Node {node.id}</h3>
-                        <p className="text-sm text-gray-600 mb-3">Model: TinyLlama-1.1B-Chat-v1.0</p>
-                        
-                        {node.status === 'occupied' && node.address ? (
-                          <div className="mt-auto">
-                            <div className="bg-blue-50 p-2 rounded-md">
-                              <p className="text-xs text-gray-700">Hosted by</p>
-                              <p className="font-mono text-sm">{formatAddress(node.address)}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-auto">
-                            <Button 
-                              color="primary" 
-                              onClick={() => openHostModal(node)}
-                              className="w-full"
-                              disabled={!modelId}
-                            >
-                              Host This Node
-                            </Button>
-                          </div>
-                        )}
+            {/* Right content area */}
+            <div className="w-[70%]">
+            <h2 className="text-xl font-semibold mb-4 ml-[30]">Available TEE Nodes</h2>
+              {/* Model Selection - Moved to the top */}
+              <div className="mb-6 ml-[30]">
+                <Select
+                  isRequired
+                  isDisabled
+                  label="Select a model to contribute"
+                  placeholder="Choose LLM model" 
+                  aria-label="Select a model to contribute"
+                  className="max-w-md"
+                  classNames={{
+                    trigger: "border-blue-500 rounded-lg h-12",
+                    label: "text-sm text-gray-700",
+                    base: "max-w-md",
+                    value: "text-sm font-medium",
+                  }}
+                  defaultSelectedKeys={["tinyllama"]}
+                  renderValue={(items) => {
+                    return items.map(item => (
+                      <div key={item.key} className="text-sm">
+                        {item.props.children}
                       </div>
-                    </CardBody>
-                  </Card>
-                ))}
+                    ));
+                  }}
+                >
+                  <SelectItem key="tinyllama">TinyLlama-1.1B-Chat-v1.0 (2 TEE Nodes)</SelectItem>
+                </Select>
+                <p className="text-sm text-gray-600 mt-2">
+                  More models will be available soon. Currently only TinyLlama-1.1B-Chat-v1.0 is supported.
+                </p>
               </div>
               
-              
+              {/* TEE Nodes Visualization - Moved below model selection */}
+              <div className="mb-8">
+                <div className="flex justify-center gap-8">
+                  {teeNodes.map((node) => (
+                    <Card 
+                      key={node.id} 
+                      className={`border-2 ${node.status === 'occupied' ? 'border-blue-400' : 'border-dashed border-gray-300'} w-full max-w-xs`}
+                      shadow="sm"
+                    >
+                      <CardBody className="p-4">
+                        <div className="aspect-square flex flex-col items-center justify-center text-center p-3">
+                          <div className="w-16 h-16 mb-3 rounded-lg bg-blue-100 flex items-center justify-center">
+                            <span className="text-2xl font-bold text-blue-600">#{node.id}</span>
+                          </div>
+                          
+                          <h3 className="text-lg font-medium mb-1">TEE Node {node.id}</h3>
+                          <p className="text-sm text-gray-600 mb-3">Model: TinyLlama-1.1B-Chat-v1.0</p>
+                          
+                          {node.status === 'occupied' && node.address ? (
+                            <div className="mt-auto">
+                              <div className="bg-blue-50 p-2 rounded-md">
+                                <p className="text-xs text-gray-700">Hosted by</p>
+                                <p className="font-mono text-sm">{formatAddress(node.address)}</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-auto">
+                              <Button 
+                                color="primary" 
+                                onClick={() => openHostModal(node)}
+                                className="w-full"
+                                disabled={!modelId}
+                              >
+                                Host This Node
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </CardBody>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             </div>
-          </>
+          </div>
         )}
       </div>
       

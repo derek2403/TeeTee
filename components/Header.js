@@ -10,9 +10,9 @@ export default function Header() {
     <div className="w-full relative border-b border-gray-200">
       <div className="w-full max-w-6xl mx-auto relative">
         <div className="flex justify-between items-center py-6">
-          <div className="w-1/5">
+          <div className="w-1/5 relative">
             <Link href="/">
-              <div className="cursor-pointer">
+              <div className="cursor-pointer relative">
                 <Image 
                   src="/logo.png" 
                   alt="TeeTee Logo" 
@@ -20,6 +20,9 @@ export default function Header() {
                   height={40} 
                   priority
                 />
+                <span className="absolute left-[105px] top-1/2 -translate-y-1/2 font-bold text-xl text-black-600">
+                  TeeTee
+                </span>
               </div>
             </Link>
           </div>
