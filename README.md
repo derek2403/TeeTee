@@ -91,16 +91,24 @@ This is done by 2 tracks: either users pay for LLM tokens usage or host their ow
 
 ---
 
-## Architecture & Tech Stack
+
+## System Architecture
+
+![System Architecture Diagram](https://github.com/derek2403/TeeTee/blob/main/public/systemArchitecture.png?raw=true)
+
+Self-hosting involves downloading an opensource LLM such as GPT-2 or TinyLlma from Ollama, DeepSeek, or Hugging Face, and splitting its layers into shards. For instance, our code and demo with Tiny Llama:
+
+- **Shard 1 (Layers 1–11)**: Uploaded into a Docker image and hosted on the first TEE (TEE 1) on Phala Network, generating an accessible URL.
+- **Shard 2 (Layers 12–22)**: Hosted similarly on a second TEE (TEE 2), which takes the URL from TEE 1 as input and generates a final URL.
+
+This final URL can then be accessed via POST requests to perform inference across the sharded LLM securely and efficiently.
 
 
-
-### Architectural Diagram
 
 
 ---
 
-### Tech Stack Overview
+## Tech Stack Overview
 
 
 
