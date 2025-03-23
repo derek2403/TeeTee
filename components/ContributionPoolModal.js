@@ -1,19 +1,39 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
 import { Input } from "@heroui/input";
 import { Tabs, Tab } from "@heroui/tabs";
 import { Button } from "@heroui/button";
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
-export default function ContributionPoolModal({ isOpen, onClose, selectedNode, isConnected, address }) {
+export default function ContributionPoolModal({ isOpen, onClose, selectedNode, isConnected, address, modelUrl = '' }) {
   const [modalTab, setModalTab] = useState('instructions'); // 'instructions' or 'submit'
-  const [modelUrl, setModelUrl] = useState('');
+  const [localModelUrl, setLocalModelUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Set the model URL from props if available
+  useEffect(() => {
+    if (modelUrl) {
+      setLocalModelUrl(modelUrl);
+    }
+  }, [modelUrl]);
+  
+  // Reset state when modal is opened with a new node
+  useEffect(() => {
+    if (isOpen && selectedNode) {
+      setModalTab('instructions');
+      if (modelUrl) {
+        setLocalModelUrl(modelUrl);
+      } else {
+        setLocalModelUrl('');
+      }
+      setIsSubmitting(false);
+    }
+  }, [isOpen, selectedNode, modelUrl]);
   
   // Reset state when modal is closed
   const handleClose = () => {
     setModalTab('instructions');
-    setModelUrl('');
+    setLocalModelUrl('');
     setIsSubmitting(false);
     onClose();
   };
@@ -24,7 +44,7 @@ export default function ContributionPoolModal({ isOpen, onClose, selectedNode, i
   };
   
   const handleSubmit = () => {
-    if (!isConnected || !modelUrl) return;
+    if (!isConnected || !localModelUrl) return;
     
     setIsSubmitting(true);
     
@@ -132,11 +152,17 @@ export default function ContributionPoolModal({ isOpen, onClose, selectedNode, i
                 <Input
                   label="Model URL"
                   placeholder="Enter the model URL"
-                  value={modelUrl}
-                  onChange={(e) => setModelUrl(e.target.value)}
+                  value={localModelUrl}
+                  onChange={(e) => setLocalModelUrl(e.target.value)}
+                  isDisabled={!!modelUrl}
                   isRequired
                   className="rounded-lg"
                 />
+                {modelUrl && (
+                  <p className="text-xs text-gray-600">
+                    The Model URL is pre-filled from the selected model.
+                  </p>
+                )}
               </div>
               
               <div className="mt-4 p-3 bg-yellow-50 rounded-lg text-sm text-yellow-800">
@@ -150,7 +176,7 @@ export default function ContributionPoolModal({ isOpen, onClose, selectedNode, i
               <Button 
                 color="success" 
                 onPress={handleSubmit}
-                isDisabled={!isConnected || !modelUrl || isSubmitting}
+                isDisabled={!isConnected || !localModelUrl || isSubmitting}
                 isLoading={isSubmitting}
                 className="rounded-lg"
               >
