@@ -23,6 +23,9 @@ app = Flask(__name__)
 model_hash = None
 model_info = {}
 
+# Add this near the top with other global variables
+node1_latest_ra_data = None  # For storing the latest RA report from Node1
+
 def get_ra_data(custom_data):
     """
     Call the Node script with custom data and return the RA report.
@@ -245,6 +248,10 @@ def process_prompt():
         ra_custom_data = f"node1_process:prompt={prompt[:50]}...,hidden_states_shape={len(hidden_states_list)}x{len(hidden_states_list[0]) if hidden_states_list else 0},time:{time.time()}"
         ra_data = get_ra_data(ra_custom_data)
         
+        # Store the RA data in the global variable for the new endpoint to access
+        global node1_latest_ra_data
+        node1_latest_ra_data = ra_data
+        
         # Send to node2 for completion
         response = requests.post(
             generate_endpoint,
@@ -304,6 +311,20 @@ def generate():
 def health():
     """Health check endpoint"""
     return jsonify({"status": "ok"})
+
+@app.route('/node1_ra_report', methods=['GET'])
+def get_node1_ra_report():
+    """Get the latest RA report from Node1"""
+    if node1_latest_ra_data:
+        return jsonify({
+            "status": "success",
+            "node1_attestation": node1_latest_ra_data
+        })
+    else:
+        return jsonify({
+            "status": "not_ready", 
+            "message": "No RA report has been generated yet"
+        })
 
 if __name__ == "__main__":
     logger.info("Starting node1 server on port 5002...")

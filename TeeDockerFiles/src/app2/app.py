@@ -259,6 +259,30 @@ def verify_model():
     else:
         return jsonify({"error": "Model hash not available", "status": "error"}), 500
 
+# Add this route to get Node2 attestation report
+@app.route('/node2_ra_report', methods=['GET'])
+def node2_ra_report():
+    """
+    Get remote attestation report for Node2.
+    """
+    try:
+        # Get the attestation report
+        report = get_attestation_report()
+        
+        # Return the report
+        return jsonify({
+            "status": "success",
+            "node2_attestation": {
+                "ra_report": report
+            }
+        })
+    except Exception as e:
+        logging.error(f"Error generating attestation report: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to generate attestation report: {str(e)}"
+        }), 500
+
 if __name__ == "__main__":
     logger.info("Starting node2 server on port 5001...")
     app.run(host="0.0.0.0", port=5001) 

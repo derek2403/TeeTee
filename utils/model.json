@@ -5,7 +5,7 @@
     "description": "A a lightweight, chat-optimized LLaMA-based model with 1.1B parameters, designed for efficient conversational AI",
     "icon": "",
     "modelUrl": "https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-    "nodeURL": "https://0c8426248007674742be42b5c597a7cb9210a300-5002.dstack-prod5.phala.network",
+    "nodeURL": "https://e3c329acf714051138becd9199470e6d1ae0cabd-5002.dstack-prod5.phala.network",
     "numberOfNodes": 2,
     "hostAddresses": [
       "0x41Db99b9A098Af28A06C0af238799c08076Af2f7",
