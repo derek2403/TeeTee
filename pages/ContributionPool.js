@@ -7,7 +7,6 @@ import ContributionPoolModal from '../components/ContributionPoolModal';
 
 export default function ContributionPool() {
   const { isConnected, address } = useAccount();
-  const [selectedModel, setSelectedModel] = useState('tinyllama');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
   
@@ -16,10 +15,6 @@ export default function ContributionPool() {
     { id: 1, status: 'empty', address: '', model: 'TinyLlama-1.1B-Chat-v1.0' },
     { id: 2, status: 'occupied', address: '0xf1a...9092', model: 'TinyLlama-1.1B-Chat-v1.0' },
   ];
-  
-  const handleModelChange = (e) => {
-    setSelectedModel(e.target.value);
-  };
   
   const openHostModal = (node) => {
     setSelectedNode(node);
@@ -68,13 +63,27 @@ export default function ContributionPool() {
         <div className="mb-6">
           <Select
             isRequired
+            isDisabled
             label="Select a model to contribute"
-            placeholder="Choose LLM model"
-            className="max-w-xs"
-            value={selectedModel}
-            onChange={handleModelChange}
+            placeholder="Choose LLM model" 
+            aria-label="Select a model to contribute"
+            className="max-w-md"
+            classNames={{
+              trigger: "border-blue-500 rounded-lg h-12",
+              label: "text-sm text-gray-700",
+              base: "max-w-md",
+              value: "text-sm font-medium",
+            }}
+            defaultSelectedKeys={["tinyllama"]}
+            renderValue={(items) => {
+              return items.map(item => (
+                <div key={item.key} className="text-sm">
+                  {item.props.children}
+                </div>
+              ));
+            }}
           >
-            <SelectItem key="tinyllama" value="tinyllama">TinyLlama-1.1B-Chat-v1.0 (2 TEE Nodes)</SelectItem>
+            <SelectItem key="tinyllama">TinyLlama-1.1B-Chat-v1.0 (2 TEE Nodes)</SelectItem>
           </Select>
           <p className="text-sm text-gray-600 mt-2">
             More models will be available soon. Currently only TinyLlama-1.1B-Chat-v1.0 is supported.
@@ -125,28 +134,7 @@ export default function ContributionPool() {
           </div>
         </div>
         
-        {/* Network Stats */}
-        <Card shadow="sm" className="w-full">
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Network Statistics</h2>
-          </CardHeader>
-          <CardBody>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-gray-50 rounded-md">
-                <p className="text-sm text-gray-600">Active Nodes</p>
-                <p className="text-2xl font-bold">1/2</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-md">
-                <p className="text-sm text-gray-600">Network Uptime</p>
-                <p className="text-2xl font-bold">99.8%</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-md">
-                <p className="text-sm text-gray-600">Contributors</p>
-                <p className="text-2xl font-bold">1</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
+        
       </div>
       
       {/* Hosting Modal as a separate component */}

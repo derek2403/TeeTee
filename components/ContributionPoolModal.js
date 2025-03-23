@@ -7,15 +7,13 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 export default function ContributionPoolModal({ isOpen, onClose, selectedNode, isConnected, address }) {
   const [modalTab, setModalTab] = useState('instructions'); // 'instructions' or 'submit'
-  const [nodeIP, setNodeIP] = useState('');
-  const [modelHash, setModelHash] = useState('');
+  const [modelUrl, setModelUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Reset state when modal is closed
   const handleClose = () => {
     setModalTab('instructions');
-    setNodeIP('');
-    setModelHash('');
+    setModelUrl('');
     setIsSubmitting(false);
     onClose();
   };
@@ -26,7 +24,7 @@ export default function ContributionPoolModal({ isOpen, onClose, selectedNode, i
   };
   
   const handleSubmit = () => {
-    if (!isConnected || !nodeIP || !modelHash) return;
+    if (!isConnected || !modelUrl) return;
     
     setIsSubmitting(true);
     
@@ -45,10 +43,10 @@ export default function ContributionPoolModal({ isOpen, onClose, selectedNode, i
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} size="lg">
-      <ModalContent>
-        <ModalHeader className="flex flex-col gap-1">
-          Host TEE Node #{selectedNode?.id}
+    <Modal isOpen={isOpen} onClose={handleClose} size="md">
+      <ModalContent className="max-h-[90vh] flex flex-col">
+        <ModalHeader className="flex flex-col gap-0 py-3">
+          <h3 className="text-lg font-semibold">Host TEE Node #{selectedNode?.id}</h3>
         </ModalHeader>
         
         <Tabs 
@@ -60,20 +58,20 @@ export default function ContributionPoolModal({ isOpen, onClose, selectedNode, i
           color="primary"
         >
           <Tab key="instructions" title="Setup Instructions">
-            <ModalBody>
-              <p>
+            <ModalBody className="overflow-y-auto max-h-[calc(90vh-180px)]">
+              <p className="text-sm">
                 To host a TEE Node for TinyLlama-1.1B-Chat-v1.0, you&apos;ll need to follow our setup instructions on GitHub.
               </p>
-              <div className="p-4 bg-blue-50 rounded-md my-3">
-                <h3 className="font-medium text-blue-800 mb-2">GitHub Setup Includes:</h3>
-                <ul className="list-disc pl-5 space-y-1 text-blue-700">
+              <div className="p-3 bg-blue-50 rounded-lg my-2">
+                <h3 className="text-sm font-medium text-blue-800 mb-1">GitHub Setup Includes:</h3>
+                <ul className="list-disc pl-4 space-y-0.5 text-xs text-blue-700">
                   <li>TEE environment configuration</li>
                   <li>Model download and installation</li>
                   <li>Network connection setup</li>
                   <li>Wallet connection instructions</li>
                 </ul>
               </div>
-              <p className="mt-2">
+              <p className="mt-2 text-sm">
                 Click the GitHub button to view detailed instructions, or switch to the &quot;Submit Details&quot; tab if you&apos;ve already completed the setup.
               </p>
             </ModalBody>
@@ -88,27 +86,37 @@ export default function ContributionPoolModal({ isOpen, onClose, selectedNode, i
           </Tab>
           
           <Tab key="submit" title="Submit Details">
-            <ModalBody>
-              <p className="mb-4">
+            <ModalBody className="overflow-y-auto max-h-[calc(90vh-180px)]">
+              <p className="mb-3 text-sm">
                 After completing the setup from GitHub instructions, please submit your node details below:
               </p>
               
               {/* Wallet Connection - Using the system's wallet connection */}
-              <div className="mb-5">
-                <h3 className="text-md font-medium mb-2">Wallet Details</h3>
+              <div className="mb-4">
+                <h3 className="text-sm font-medium mb-2">Wallet Details</h3>
                 
                 {isConnected ? (
-                  <div className="flex items-center justify-between bg-blue-50 p-3 rounded-md">
-                    <div>
-                      <p className="text-sm font-medium">Connected Wallet</p>
-                      <p className="font-mono text-xs">{formatAddress(address)}</p>
+                  <div className="flex items-center justify-between bg-gray-100 p-3 rounded-lg border border-gray-200 cursor-not-allowed">
+                    <div className="flex-grow">
+                      <p className="text-sm">Connected Wallet</p>
+                      <p className="font-mono text-sm text-gray-700">{formatAddress(address)}</p>
                     </div>
-                    <div className="ml-3">
-                      <ConnectButton />
+                    <div className="flex-shrink-0 flex items-center">
+                      <span className="text-sm font-medium">0.99 ETH</span>
+                      <div className="ml-2 flex flex-col items-end">
+                        <span className="text-xs flex items-center">
+                          Base Sepolia 
+                          <img 
+                            src="/Base.png" 
+                            alt="Base" 
+                            className="ml-1 w-4 h-4 rounded-full"
+                          />
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-yellow-50 p-3 rounded-md mb-3">
+                  <div className="bg-yellow-50 p-3 rounded-lg mb-3">
                     <p className="text-sm text-yellow-800 mb-2">
                       You need to connect your wallet to host a TEE node.
                     </p>
@@ -119,44 +127,32 @@ export default function ContributionPoolModal({ isOpen, onClose, selectedNode, i
                 )}
               </div>
               
-              {/* Node Details Form */}
+              {/* Simplified Form - Only Model URL */}
               <div className="space-y-4">
                 <Input
-                  label="Node IP Address"
-                  placeholder="Enter your node's IP address"
-                  value={nodeIP}
-                  onChange={(e) => setNodeIP(e.target.value)}
+                  label="Model URL"
+                  placeholder="Enter the model URL"
+                  value={modelUrl}
+                  onChange={(e) => setModelUrl(e.target.value)}
                   isRequired
-                />
-                
-                <Input
-                  label="Model Hash"
-                  placeholder="Enter the model hash from setup"
-                  value={modelHash}
-                  onChange={(e) => setModelHash(e.target.value)}
-                  isRequired
-                />
-                
-                <Input
-                  label="Port (optional)"
-                  placeholder="Node port if not using default"
-                  type="number"
+                  className="rounded-lg"
                 />
               </div>
               
-              <div className="mt-4 p-3 bg-yellow-50 rounded-md text-sm text-yellow-800">
-                <p>⚠️ Please ensure all details are correct. Incorrect information may result in your node not being properly connected to the network.</p>
+              <div className="mt-4 p-3 bg-yellow-50 rounded-lg text-sm text-yellow-800">
+                <p>⚠️ Please ensure the Model URL is correct. Incorrect information may result in your node not being properly connected to the network.</p>
               </div>
             </ModalBody>
             <ModalFooter>
-              <Button color="danger" variant="light" onPress={handleClose}>
+              <Button color="danger" variant="light" onPress={handleClose} className="rounded-lg">
                 Cancel
               </Button>
               <Button 
                 color="success" 
                 onPress={handleSubmit}
-                isDisabled={!isConnected || !nodeIP || !modelHash || isSubmitting}
+                isDisabled={!isConnected || !modelUrl || isSubmitting}
                 isLoading={isSubmitting}
+                className="rounded-lg"
               >
                 {isSubmitting ? "Submitting..." : "Submit Node Details"}
               </Button>
