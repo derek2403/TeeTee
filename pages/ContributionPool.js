@@ -37,8 +37,20 @@ export default function ContributionPool() {
       if (window.ethereum) {
         try {
           const provider = new ethers.BrowserProvider(window.ethereum);
-          const contract = new ethers.Contract(contractAddress, contractABI, provider);
-          setContract(contract);
+          
+          // If user is connected, use a signer for write operations
+          let contractInstance;
+          if (isConnected) {
+            const signer = await provider.getSigner();
+            contractInstance = new ethers.Contract(contractAddress, contractABI, signer);
+            console.log("Contract initialized with signer for write operations");
+          } else {
+            // Otherwise use read-only provider
+            contractInstance = new ethers.Contract(contractAddress, contractABI, provider);
+            console.log("Contract initialized with provider for read-only operations");
+          }
+          
+          setContract(contractInstance);
         } catch (error) {
           console.error("Error connecting to contract:", error);
         } finally {
@@ -50,7 +62,7 @@ export default function ContributionPool() {
     };
     
     connectToContract();
-  }, []);
+  }, [isConnected]); // Add isConnected as dependency to reinitialize when connection status changes
   
   // Fetch LLM entries when contract is ready
   useEffect(() => {
