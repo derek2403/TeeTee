@@ -90,7 +90,7 @@ export default function ContributionPoolModal({ isOpen, onClose, selectedNode, i
   };
 
   const goToGitHub = () => {
-    window.open('https://github.com/TEE-AI/setup-instructions', '_blank');
+    window.open('https://github.com/derek2403/TeeTee/blob/derek/TeeDockerFiles/README.md', '_blank');
     // Don't close the modal, let the user decide
   };
 
