@@ -121,32 +121,57 @@ Here's an illustration of this process clearly showing paths and ports:
 **Data Flow with Attestation (Bottom Diagram)**:
 
 1. **User Query**: User submits a query (e.g., \"What is Ethereum?\") to TEE 1.
-2. **TEE 1 Attestation**: TEE 1 processes and converts the query to tensor form and generates an **Attestation Report**, verifying authenticity.
+2. **TEE 1 Attestation**: TEE 1 processes and converts the query to tensor form and generates an **On Chain Attestation Report**, verifying authenticity.
 3. **Data to TEE 2**: TEE 1 forwards this tensor data to TEE 2.
-4. **TEE 2 Processing and Attestation**: TEE 2 processes tensor data, generates a human-readable response, and attaches its own **Attestation Report**.
+4. **TEE 2 Processing and Attestation**: TEE 2 processes tensor data, generates a human-readable response, and attaches its own **On Chain Attestation Report**.
 5. **Final Response**: TEE 2's output (with attestation) is sent back through TEE 1 to the user. TEE 1 merely acts as a relay with no further processing.
 
 **Why this Design?**  
 Passing responses through TEE 1 ensures users interact with a single endpoint, simplifying integration and improving overall usability and convenience.
 
+> ⚠️ **Note:** This is an early-stage PoC implemented over a focused 3-day sprint. It serves as a foundational demo of our concept. For a look at the complete system architecture we're building toward, see the [Future Implementation](#future-implementation) section below.
 
 ---
 
 ## Tech Stack Overview
 
-
+- **Next.js 15** – Front-end framework
+- **Three.js** – Interactive front-end visuals
+- **Tailwind CSS** – UI styling
+- **Hero UI (formerly NextUI)** – UI components library
+- **RainbowKit** – Wallet integration
+- **Base Blockchain** – Payments for LLM tokens and profit splitting
+- **Phala Network** – TEE hosting and on chain attestation proofs
+- **Docker** – Containerization for hosting code securely in Phala TEEs
+- **Ethers.js** – Blockchain interaction and smart contract integration
 
 ---
+
+## How We Are Different
+
+---
+
+We recognized a key gap: many teams want to securely wrap LLMs within a Trusted Execution Environment (TEE), but existing TEEs have strict size limits, preventing large models from being fully hosted. Moreover, current GPU providers, although helpful in hosting models, operate centralized services and cannot fully guarantee data privacy.
+
+Here's how TeeTee is uniquely positioned:
+
+| **Feature**                      | **Traditional GPU Providers**                         | **TeeTee**                                  |
+|----------------------------------|-------------------------------------------------------|---------------------------------------------|
+| **LLM Hosting Capability**       | Constrained by single GPU or TEE memory limits, availability, and high costs | Flexible and scalable via model sharding across multiple TEEs, overcoming memory limitations |
+| **Privacy & Security Assurance** | Limited privacy guarantees due to centralized infrastructure | Fully secure through decentralized TEEs with verifiable on-chain attestations |
+| **Infrastructure Centralization**| Completely centralized; dependent on a single provider's infrastructure | Fully decentralized; operates similarly to blockchain nodes with independent TEEs |
+| **Fault Tolerance**              | High risk of downtime or failure due to single provider dependency | Robust fault tolerance; automatic replacement and redundancy if any single TEE fails |
+| **Decentralization & Control**   | Provider-controlled GPU servers, causing dependency and centralization | Community-driven and decentralized; the more participants hosting TEEs, the greater the network resilience |
+
+
+In summary, TeeTee provides a secure, scalable, and fully decentralized approach to LLM inference, overcoming limitations faced by current GPU and TEE-based solutions.
+
 
 ## Future Implementations
 
 
 ---
 
-## How We Are Different
-
-
----
 
 ## Team
 
