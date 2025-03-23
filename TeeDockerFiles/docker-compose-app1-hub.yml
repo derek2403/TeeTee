@@ -8,7 +8,7 @@
         - HF_HOME=/app/models
         - TRANSFORMERS_OFFLINE=0
         - TOKENIZERS_PARALLELISM=false
-        - NODE2_URL=https://[your-app2-hash]-5001.dstack-prod5.phala.network
+        - NODE2_URL=https://2ac100b57f58fc36993159c1d069cc33b10e8d3f-5001.dstack-prod5.phala.network
       restart: on-failure:5
       volumes:
         - /var/run/tappd.sock:/var/run/tappd.sock

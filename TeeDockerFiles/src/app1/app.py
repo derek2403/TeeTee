@@ -13,6 +13,8 @@ import shutil
 import subprocess
 import sys
 import gdown
+from transformers.modeling_outputs import BaseModelOutputWithPast
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('node1')
@@ -22,9 +24,7 @@ app = Flask(__name__)
 # For storing the model verification hash
 model_hash = None
 model_info = {}
-
-# Add this near the top with other global variables
-node1_latest_ra_data = None  # For storing the latest RA report from Node1
+node1_latest_ra_data = None
 
 def get_ra_data(custom_data):
     """
@@ -59,7 +59,6 @@ def generate_model_hash(model):
     }
     
     # Get a sample of model weights (first layer weights)
-    # We'll use the first layer's weights as a representative sample
     param_sample = None
     for name, param in model.named_parameters():
         if 'layers.0' in name and param_sample is None:
@@ -88,19 +87,6 @@ def download_model_from_gdrive():
     model_dir = "/app/models/tinyllama-1b"
     os.makedirs(model_dir, exist_ok=True)
     
-    # Google Drive file IDs for each model file
-    # The URLs are extracted from the folder shared: https://drive.google.com/drive/folders/1Iua1_n95NSgndooGFPfppaKTti5mmtEy
-    drive_files = {
-        "config.json": "1Iua1_n95NSgndooGFPfppaKTti5mmtEy",
-        "generation_config.json": "1Iua1_n95NSgndooGFPfppaKTti5mmtEy", 
-        "model.safetensors": "1Iua1_n95NSgndooGFPfppaKTti5mmtEy",
-        "tokenizer.json": "1Iua1_n95NSgndooGFPfppaKTti5mmtEy",
-        "tokenizer_config.json": "1Iua1_n95NSgndooGFPfppaKTti5mmtEy",
-        "special_tokens_map.json": "1Iua1_n95NSgndooGFPfppaKTti5mmtEy",
-        "tokenizer.model": "1Iua1_n95NSgndooGFPfppaKTti5mmtEy"
-    }
-    
-    # Install gdown if not already installed
     try:
         import gdown
     except ImportError:
@@ -109,7 +95,6 @@ def download_model_from_gdrive():
         import gdown
     
     success = True
-    # Download the entire folder
     try:
         logger.info(f"Downloading entire model folder from Google Drive...")
         gdown.download_folder(
@@ -122,15 +107,42 @@ def download_model_from_gdrive():
         logger.error(f"Failed to download model folder: {str(e)}")
         success = False
     
-    # Create a symlink from model.safetensors to pytorch_model.bin if needed
-    safetensors_path = os.path.join(model_dir, "model.safetensors")
-    pytorch_path = os.path.join(model_dir, "pytorch_model.bin") 
-    
-    if os.path.exists(safetensors_path) and not os.path.exists(pytorch_path):
-        logger.info("Using model.safetensors as the model weights file")
-        # No need for a symlink as transformers can load .safetensors files directly
-    
     return success
+
+# Create a custom class to modify the forward pass for Node1
+class Node1Model(torch.nn.Module):
+    def __init__(self, base_model, middle_layer):
+        super().__init__()
+        self.config = base_model.config
+        self.embed_tokens = base_model.model.embed_tokens
+        self.norm = base_model.model.norm
+        
+        # Only include the first half of layers
+        self.layers = base_model.model.layers[:middle_layer]
+        
+        logger.info(f"Node1 initialized with layers 0 to {middle_layer-1}")
+
+    def forward(self, input_ids, attention_mask=None, output_hidden_states=True):
+        # Get embeddings
+        hidden_states = self.embed_tokens(input_ids)
+
+        # Store all hidden states
+        all_hidden_states = () if output_hidden_states else None
+        
+        # Process through available layers
+        for idx, layer in enumerate(self.layers):
+            if output_hidden_states:
+                all_hidden_states = all_hidden_states + (hidden_states,)
+                
+            hidden_states = layer(hidden_states, attention_mask)[0]
+            
+        # Return the output and the hidden_states
+        return BaseModelOutputWithPast(
+            last_hidden_state=hidden_states,
+            hidden_states=all_hidden_states,
+            attentions=None,
+            past_key_values=None
+        )
 
 # Initialize model
 logger.info("Initializing Node1 (first half of model)...")
@@ -151,7 +163,7 @@ try:
         torch.cuda.empty_cache()
     
     logger.info("Loading model from local directory...")
-    model = AutoModelForCausalLM.from_pretrained(
+    full_model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch.float16,
         device_map="cpu",  # Initial CPU loading
@@ -160,9 +172,22 @@ try:
     )
     logger.info("Model loaded successfully")
     
+    # Get the total layers and mid point
+    total_layers = len(full_model.model.layers)
+    middle_layer = total_layers // 2
+    logger.info(f"Model has {total_layers} total layers")
+    logger.info(f"Node1 will use layers 0 to {middle_layer-1}")
+    
+    # Create Node1 specific model with just the first half of layers
+    model = Node1Model(full_model, middle_layer)
+    
     # Generate and store model hash
-    model_hash, model_info = generate_model_hash(model)
+    model_hash, model_info = generate_model_hash(full_model)
     logger.info(f"Model verification hash: {model_hash}")
+    
+    # Release memory from the full model
+    del full_model
+    gc.collect()
     
     # Move to GPU if available
     if torch.cuda.is_available():
@@ -175,20 +200,16 @@ except Exception as e:
     logger.error(traceback.format_exc())
     raise  # This will cause the container to exit on model load failure
 
-# Get the total layers and mid point
-total_layers = len(model.model.layers)
-middle_layer = total_layers // 2
-logger.info(f"Model has {total_layers} total layers")
-logger.info(f"Node1 will use layers 0 to {middle_layer-1}")
-logger.info(f"Model initialized on {model.device}")
-
-# Add model verification endpoint
 @app.route('/verify', methods=['GET'])
 def verify_model():
     """Endpoint to verify the model's identity and integrity"""
     if model_hash:
         response = {
             "model_hash": model_hash,
+            "model_info": {
+                "total_layers": len(model.layers),
+                "model_type": "TinyLlama-1.1B-Chat-v1.0 (Node1 - First Half)"
+            }
         }
         return jsonify(response)
     else:
@@ -208,16 +229,23 @@ def process_prompt():
         chat_prompt = tokenizer.apply_chat_template([{"role": "user", "content": prompt}], tokenize=False)
         
         # Tokenize the input
-        input_ids = tokenizer.encode(chat_prompt, return_tensors="pt").to(model.device)
+        input_ids = tokenizer.encode(chat_prompt, return_tensors="pt").to(model.layers[0].parameters().__next__().device)
+        attention_mask = torch.ones_like(input_ids)
         logger.info(f"Input shape: {input_ids.shape}")
         
         with torch.no_grad():
             # Process through the first half of the model layers
-            outputs = model(input_ids, output_hidden_states=True)
+            outputs = model(input_ids, attention_mask=attention_mask, output_hidden_states=True)
             
-            # Get the hidden states from the last layer of the first half
-            hidden_states = outputs.hidden_states[middle_layer]
+            # Get the hidden states from the last processed layer
+            hidden_states = outputs.last_hidden_state
+            all_hidden_states = outputs.hidden_states
+            
             logger.info(f"Hidden states shape: {hidden_states.shape}")
+            logger.info(f"Processed through {len(all_hidden_states)} layers")
+            
+            # Prepare key-value cache if needed for Node2
+            past_key_values = None
             
             # Convert to list for JSON serialization
             hidden_states_list = hidden_states.cpu().numpy().tolist()
@@ -228,11 +256,21 @@ def process_prompt():
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         
+        # Create serialized position IDs for continuation
+        position_ids = torch.arange(input_ids.shape[1], device=input_ids.device).unsqueeze(0)
+        position_ids_list = position_ids.cpu().numpy().tolist()
+        
         # Prepare data for node2
         node2_data = {
             "input_ids": input_ids_list,
+            "attention_mask": attention_mask.cpu().numpy().tolist(),
+            "position_ids": position_ids_list,
             "hidden_states": hidden_states_list,
-            "prompt": chat_prompt
+            "prompt": chat_prompt,
+            "layer_info": {
+                "total_layers": len(model.layers),
+                "middle_layer": len(model.layers)  # This is the next layer Node2 should start from
+            }
         }
         
         logger.info("Sending processed data to node2...")
@@ -245,7 +283,7 @@ def process_prompt():
         
         # Generate RA data using the processed data as custom data
         logger.info("Generating remote attestation data for processed output...")
-        ra_custom_data = f"node1_process:prompt={prompt[:50]}...,hidden_states_shape={len(hidden_states_list)}x{len(hidden_states_list[0]) if hidden_states_list else 0},time:{time.time()}"
+        ra_custom_data = f"node1_process:prompt={prompt[:50]}...,hidden_states_shape={len(hidden_states_list)}x{len(hidden_states_list[0]) if hidden_states_list else 0},time:{time.time()},layers:0-{len(model.layers)-1}"
         ra_data = get_ra_data(ra_custom_data)
         
         # Store the RA data in the global variable for the new endpoint to access
@@ -283,8 +321,6 @@ def process_prompt():
         logger.error(traceback.format_exc())
         return jsonify({"output": f"Error: {str(e)}"})
       
-
-# Add the client endpoint
 @app.route('/generate', methods=['POST'])
 def generate():
     """Client-facing endpoint for the complete model"""
@@ -310,7 +346,12 @@ def generate():
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""
-    return jsonify({"status": "ok"})
+    return jsonify({
+        "status": "ok",
+        "model_type": "TinyLlama-1.1B-Chat-v1.0 (Node1)",
+        "layers": f"0-{len(model.layers)-1}",
+        "memory_usage": f"{torch.cuda.memory_allocated() / (1024 ** 3):.2f} GB" if torch.cuda.is_available() else "CPU only"
+    })
 
 @app.route('/node1_ra_report', methods=['GET'])
 def get_node1_ra_report():
