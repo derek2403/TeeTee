@@ -284,10 +284,15 @@ export default function Models() {
                           </div>
                           
                           {/* Active status indicator */}
-                          {model.hostAddresses.length >= 2 && (
+                          {model.hostAddresses.length >= 2 ? (
                             <div className="flex items-center gap-1">
                               <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
                               <span className="text-xs text-green-600">Active</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                              <span className="text-xs text-yellow-600">Available for hosting</span>
                             </div>
                           )}
                         </div>
