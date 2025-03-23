@@ -7,6 +7,8 @@ A breakthrough infrastructure that splits massive large LLM across multiple TEE,
 
 For a comprehensive guide on hosting and the underlying concept, please refer to this [README Guide](https://github.com/derek2403/TeeTee/blob/main/TeeDockerFiles/README.md). 
 
+We’ve deployed a live demonstration of TeeTee at [tee-tee.vercel.app](https://tee-tee.vercel.app/).  
+
 ---
 
 ## Inspiration: How We Came Up with This Idea💡
