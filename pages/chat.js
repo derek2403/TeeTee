@@ -78,8 +78,8 @@ export default function Chat() {
       const emptyEvent = { target: { value: "" } };
       aiChat.handleInputChange(emptyEvent);
       
-      // Call our proxy API route instead of the direct endpoint
-      const response = await fetch("/api/tee-proxy", {
+      // Call our proxy API route to get the AI response
+      const responsePending = fetch("/api/tee-proxy", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -89,22 +89,137 @@ export default function Chat() {
         }),
       });
       
+      // Immediately fetch the Node1 RA report while waiting for the main response
+      try {
+        console.log("Fetching Node1 attestation...");
+        const node1RaResponse = await fetch("/api/ra-report", {
+          headers: {
+            // Force a fresh request instead of using cache
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        console.log("Node1 RA status:", node1RaResponse.status, node1RaResponse.statusText);
+        
+        // Check if we got a valid response
+        if (!node1RaResponse.ok) {
+          console.error("Node1 RA request failed:", node1RaResponse.status, node1RaResponse.statusText);
+          const errorText = await node1RaResponse.text();
+          console.error("Error details:", errorText);
+          return;  // Don't proceed with processing
+        }
+        
+        const node1RaData = await node1RaResponse.json();
+        console.log("Node1 RA full response:", JSON.stringify(node1RaData, null, 2));
+        
+        // Try multiple paths to extract Node1 quote
+        let node1Quote = null;
+        
+        if (node1RaData.node1_attestation?.ra_report?.quote) {
+          node1Quote = node1RaData.node1_attestation.ra_report.quote;
+          console.log("Found Node1 quote in node1_attestation.ra_report.quote");
+        } else if (node1RaData.attestation?.ra_report?.quote) {
+          node1Quote = node1RaData.attestation.ra_report.quote;
+          console.log("Found Node1 quote in attestation.ra_report.quote");
+        } else if (node1RaData.ra_report?.quote) {
+          node1Quote = node1RaData.ra_report.quote;
+          console.log("Found Node1 quote in ra_report.quote");
+        } else {
+          console.log("Available fields in Node1 response:", Object.keys(node1RaData));
+          if (node1RaData.status === "success") {
+            console.log("Node1 success response but no quote found");
+          } else {
+            console.log("Node1 response status not success:", node1RaData.status);
+          }
+        }
+        
+        // Add a message with the Node1 quote if found
+        if (node1Quote) {
+          console.log("Adding Node1 attestation message with quote length:", node1Quote.length);
+          aiChat.addMessage("node1-attestation", "Node1 Attestation Report", 0, {
+            node1: node1Quote,
+            node2: ""
+          });
+          console.log("Node1 attestation message added to chat");
+        } else {
+          console.log("No Node1 quote found in the response");
+        }
+      } catch (error) {
+        console.error("Error fetching Node1 RA report:", error);
+      }
+      
+      // Wait for the main response to complete
+      const response = await responsePending;
       const data = await response.json();
       
       // Extract the response from the output field
       const aiResponse = data.output;
       
-      // Extract attestation quotes for display (truncated)
-      const attestationQuotes = {
-        node1: data.attestation?.node1_attestation?.ra_report?.quote || "",
-        node2: data.attestation?.ra_report?.quote || "",
-      };
+      // Add the response WITHOUT attestation quotes
+      aiChat.addMessage("assistant", aiResponse, 0);
       
-      // Add the response and quotes to the chat history (without token cost)
-      aiChat.addMessage("assistant", aiResponse, 0, attestationQuotes);
+      // Extract Node2 attestation directly from the tee-proxy response
+      try {
+        console.log("Checking for Node2 attestation in main response...");
+        // Log just a small sample to avoid cluttering the console
+        const dataSample = {...data};
+        if (dataSample.attestation?.ra_report?.quote) {
+          dataSample.attestation.ra_report.quote = dataSample.attestation.ra_report.quote.substring(0, 30) + "...";
+        }
+        console.log("Response structure sample:", JSON.stringify(dataSample, null, 2));
+        
+        // Find Node2 attestation in the response using various possible paths
+        let node2Quote = null;
+        
+        if (data.attestation?.ra_report?.quote) {
+          node2Quote = data.attestation.ra_report.quote;
+          console.log("FOUND Node2 quote in data.attestation.ra_report.quote");
+        } else if (data.ra_report?.quote) {
+          node2Quote = data.ra_report.quote;
+          console.log("FOUND Node2 quote in data.ra_report.quote");
+        } else if (data.node2_attestation?.ra_report?.quote) {
+          node2Quote = data.node2_attestation.ra_report.quote;
+          console.log("FOUND Node2 quote in data.node2_attestation.ra_report.quote");
+        } else {
+          console.log("Available fields in response:", Object.keys(data));
+          if (data.attestation) {
+            console.log("Fields in data.attestation:", Object.keys(data.attestation));
+            if (data.attestation.ra_report) {
+              console.log("Fields in data.attestation.ra_report:", Object.keys(data.attestation.ra_report));
+            }
+          }
+        }
+        
+        // Add Node2 attestation as a message if found
+        if (node2Quote) {
+          console.log("Adding Node2 attestation message with quote length:", node2Quote.length);
+          // Force immediate update
+          setTimeout(() => {
+            aiChat.addMessage("node2-attestation", "Node2 Attestation", 0, {
+              node1: "",
+              node2: node2Quote
+            });
+            console.log("Node2 attestation message added to chat");
+            console.log("Current message count:", aiChat.messages.length);
+          }, 100);
+        } else {
+          console.log("No Node2 attestation found in the main response");
+        }
+      } catch (error) {
+        console.error("Error extracting Node2 attestation from response:", error);
+      }
       
     } catch (error) {
       console.error("Error generating response:", error);
+    }
+  };
+
+  // Add this handler for the Enter key
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && aiChat.inputText.trim() && !aiChat.isGenerating) {
+      e.preventDefault();
+      generateResponse();
     }
   };
 
@@ -228,58 +343,82 @@ export default function Chat() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {aiChat.messages.map((message, index) => (
-                    <div
-                      key={index}
-                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
+                  {aiChat.messages.map((message, index) => {
+                    console.log(`Rendering message ${index}:`, message.role, 
+                                message.role === 'node2-attestation' ? 
+                                `with quote length: ${message.attestationQuotes?.node2?.length || 0}` : '');
+                    return (
                       <div
-                        className={`max-w-[70%] p-3 rounded-lg ${message.role === 'user'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-800'
-                          }`}
+                        key={index}
+                        className={`flex ${
+                          message.role === 'user' 
+                            ? 'justify-end' 
+                            : message.role === 'node1-attestation' || message.role === 'node2-attestation'
+                              ? 'justify-center' 
+                              : 'justify-start'
+                        }`}
                       >
-                        <p className="whitespace-pre-line text-sm break-words">{message.content}</p>
-                        {message.tokens > 0 && (
-                          <div className="mt-1 text-xs opacity-80 text-right">
-                            {message.tokens} tokens
-                          </div>
-                        )}
-                        
-                        {/* Display attestation quotes for assistant messages */}
-                        {message.role === 'assistant' && message.attestationQuotes && (
-                          <div className="mt-2 border-t pt-1 text-xs">
-                            {message.attestationQuotes.node1 && (
-                              <div className="flex items-center justify-between mt-1">
-                                <span className="font-mono truncate w-56">{message.attestationQuotes.node1.substring(0, 40)}...</span>
+                        <div
+                          className={`${
+                            message.role === 'user'
+                              ? 'max-w-[70%] bg-blue-600 text-white'
+                              : message.role === 'node1-attestation' || message.role === 'node2-attestation'
+                                ? 'max-w-[85%] bg-green-50 border border-green-200'
+                                : 'max-w-[70%] bg-gray-100 text-gray-800'
+                          } p-3 rounded-lg`}
+                        >
+                          {message.role === 'node1-attestation' ? (
+                            <div className="text-xs">
+                              <div className="flex items-center justify-between">
+                                <div className="font-semibold text-green-700 flex items-center">
+                                  <span>Node1 Attestation:</span>
+                                  <span className="font-mono ml-2 truncate max-w-[200px]">
+                                    {message.attestationQuotes.node1.substring(0, 30)}...
+                                  </span>
+                                </div>
                                 <button 
                                   onClick={() => {navigator.clipboard.writeText(message.attestationQuotes.node1)}}
-                                  className="p-1 hover:bg-gray-200 rounded"
+                                  className="p-1 hover:bg-gray-200 rounded ml-2"
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                   </svg>
                                 </button>
                               </div>
-                            )}
-                            {message.attestationQuotes.node2 && (
-                              <div className="flex items-center justify-between mt-1">
-                                <span className="font-mono truncate w-56">{message.attestationQuotes.node2.substring(0, 40)}...</span>
+                            </div>
+                          ) : message.role === 'node2-attestation' ? (
+                            <div className="text-xs">
+                              <div className="flex items-center justify-between">
+                                <div className="font-semibold text-green-700 flex items-center">
+                                  <span>Node2 Attestation:</span>
+                                  <span className="font-mono ml-2 truncate max-w-[200px]">
+                                    {message.attestationQuotes.node2.substring(0, 30)}...
+                                  </span>
+                                </div>
                                 <button 
                                   onClick={() => {navigator.clipboard.writeText(message.attestationQuotes.node2)}}
-                                  className="p-1 hover:bg-gray-200 rounded"
+                                  className="p-1 hover:bg-gray-200 rounded ml-2"
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                   </svg>
                                 </button>
                               </div>
-                            )}
-                          </div>
-                        )}
+                            </div>
+                          ) : (
+                            <>
+                              <p className="whitespace-pre-line text-sm break-words">{message.content}</p>
+                              {message.tokens > 0 && (
+                                <div className="mt-1 text-xs opacity-80 text-right">
+                                  {message.tokens} tokens
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {/* Pending message */}
                   {aiChat.isGenerating && (
@@ -305,6 +444,7 @@ export default function Chat() {
                   type="text"
                   value={aiChat.inputText}
                   onChange={aiChat.handleInputChange}
+                  onKeyDown={handleKeyDown}
                   placeholder="Type your message here..."
                   disabled={aiChat.isGenerating}
                   size="md"

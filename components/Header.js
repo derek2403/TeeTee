@@ -26,7 +26,7 @@ export default function Header() {
           
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <div className="flex items-center gap-8">
-              <Link href="/AIChat">
+              <Link href="/chat">
                 <span className="font-medium cursor-pointer hover:text-blue-600 transition-colors whitespace-nowrap">Chat</span>
               </Link>
               <Link href="/models">
