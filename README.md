@@ -107,7 +107,7 @@ This final URL can then be accessed via POST requests to perform inference acros
 
 Here's an illustration of this process clearly showing paths and ports:
 
-![Data Diagram](https://github.com/derek2403/TeeTee/blob/main/public/HowItWorks.png?raw=true)
+![Data Diagram](https://raw.githubusercontent.com/derek2403/TeeTee/refs/heads/main/public/HowItWorks.png)
 
 
 **Endpoint Communication Flow (Top Diagram)**:
