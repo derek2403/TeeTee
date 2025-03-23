@@ -245,22 +245,47 @@ export default function Chat() {
       // Extract Node2 attestation directly from the tee-proxy response
       try {
         console.log("Checking for Node2 attestation in main response...");
-        console.log("Response structure sample:", JSON.stringify(data, null, 2).substring(0, 500) + "...");
+        // Log just a small sample to avoid cluttering the console
+        const dataSample = {...data};
+        if (dataSample.attestation?.ra_report?.quote) {
+          dataSample.attestation.ra_report.quote = dataSample.attestation.ra_report.quote.substring(0, 30) + "...";
+        }
+        console.log("Response structure sample:", JSON.stringify(dataSample, null, 2));
         
-        if (data.attestation && data.attestation.ra_report && data.attestation.ra_report.quote) {
+        // Find Node2 attestation in the response using various possible paths
+        let node2Quote = null;
+        
+        if (data.attestation?.ra_report?.quote) {
+          node2Quote = data.attestation.ra_report.quote;
           console.log("FOUND Node2 quote in data.attestation.ra_report.quote");
-          
-          // Add a separate message for Node2 attestation
-          const quoteLength = data.attestation.ra_report.quote.length;
-          console.log("Adding Node2 attestation message with quote length:", quoteLength);
-          
-          // Store the full attestation, not just the truncated version
-          aiChat.addMessage("node2-attestation", "Node2 Attestation", 0, {
-            node2: data.attestation.ra_report.quote // Store the full quote
-          });
-          
-          console.log("Node2 attestation message added to chat");
-          console.log("Current message count:", aiChat.messages.length);
+        } else if (data.ra_report?.quote) {
+          node2Quote = data.ra_report.quote;
+          console.log("FOUND Node2 quote in data.ra_report.quote");
+        } else if (data.node2_attestation?.ra_report?.quote) {
+          node2Quote = data.node2_attestation.ra_report.quote;
+          console.log("FOUND Node2 quote in data.node2_attestation.ra_report.quote");
+        } else {
+          console.log("Available fields in response:", Object.keys(data));
+          if (data.attestation) {
+            console.log("Fields in data.attestation:", Object.keys(data.attestation));
+            if (data.attestation.ra_report) {
+              console.log("Fields in data.attestation.ra_report:", Object.keys(data.attestation.ra_report));
+            }
+          }
+        }
+        
+        // Add Node2 attestation as a message if found
+        if (node2Quote) {
+          console.log("Adding Node2 attestation message with quote length:", node2Quote.length);
+          // Force immediate update
+          setTimeout(() => {
+            aiChat.addMessage("node2-attestation", "Node2 Attestation", 0, {
+              node1: "",
+              node2: node2Quote
+            });
+            console.log("Node2 attestation message added to chat");
+            console.log("Current message count:", aiChat.messages.length);
+          }, 100);
         } else {
           console.log("No Node2 attestation found in the main response");
         }

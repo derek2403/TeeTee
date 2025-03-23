@@ -145,7 +145,7 @@ const Dashboard = ({ tokenBalance, aiChat, onClose, contract, llmEntries = [], u
           <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
             <div>
               <h3 className="text-sm font-medium text-black">Models Hosted</h3>
-              <p className="text-xs text-gray-700">Total LLMs you're hosting</p>
+              <p className="text-xs text-gray-700">Total LLMs you&apos;re hosting</p>
             </div>
             <div className="text-xl font-bold text-black">{ownedModels}</div>
           </div>

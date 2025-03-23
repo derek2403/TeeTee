@@ -279,7 +279,7 @@ export default function TestPage() {
             {/* User Deposit Section */}
             <div className="p-4 border rounded-lg bg-purple-50">
               <h2 className="text-xl font-semibold mb-4">Purchase Tokens</h2>
-              <p className="text-sm text-gray-600 mb-3">Deposit ETH to purchase tokens. For every 0.002 ETH, you'll receive 100,000 tokens.</p>
+              <p className="text-sm text-gray-600 mb-3">Deposit ETH to purchase tokens. For every 0.002 ETH, you&apos;ll receive 100,000 tokens.</p>
               <form onSubmit={(e) => { e.preventDefault(); handleDeposit(); }} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">LLM ID</label>
@@ -292,7 +292,7 @@ export default function TestPage() {
                     placeholder="0"
                     required
                   />
-                  <p className="text-sm text-gray-500 mt-1">Use the "Select" button above to fill this automatically</p>
+                  <p className="text-sm text-gray-500 mt-1">Use the &quot;Select&quot; button above to fill this automatically</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Amount (ETH, min 0.002)</label>
@@ -307,7 +307,7 @@ export default function TestPage() {
                     required
                   />
                   <p className="text-sm text-gray-500 mt-1">
-                    You'll receive approximately {depositData.amount && !isNaN(parseFloat(depositData.amount)) ? 
+                    You&apos;ll receive approximately {depositData.amount && !isNaN(parseFloat(depositData.amount)) ? 
                       Math.floor((parseFloat(depositData.amount) / 0.002) * 100000) : 0} tokens
                   </p>
                 </div>
@@ -347,7 +347,7 @@ export default function TestPage() {
                 </button>
                 {parseInt(tokenBalance) <= 0 && (
                   <p className="text-sm text-red-600 mt-1">
-                    You don't have enough tokens. Purchase some above.
+                    You don&apos;t have enough tokens. Purchase some above.
                   </p>
                 )}
               </form>
@@ -420,7 +420,7 @@ export default function TestPage() {
                     placeholder="0"
                     required
                   />
-                  <p className="text-sm text-gray-500 mt-1">Use the "Select" button above to fill this automatically</p>
+                  <p className="text-sm text-gray-500 mt-1">&quot;Use the Select&quot; button above to fill this automatically</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">New URL (optional)</label>
@@ -543,7 +543,7 @@ export default function TestPage() {
                     placeholder="0"
                     required
                   />
-                  <p className="text-sm text-gray-500 mt-1">Use the "Select" button above to fill this automatically</p>
+                  <p className="text-sm text-gray-500 mt-1">Use the &quot;Select&quot; button above to fill this automatically</p>
                 </div>
                 <div className="mb-4">
                   <p className="text-sm font-medium text-gray-700">

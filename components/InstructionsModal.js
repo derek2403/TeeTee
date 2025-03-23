@@ -206,7 +206,7 @@ export default async function handler(req, res) {
                   <div className="mt-4">
                     <h5 className="font-medium mb-2">Using a Server-Side Proxy</h5>
                     <p className="text-xs mb-2">
-                      If you're making requests from a frontend application, you may want to use
+                      If you&apos;re making requests from a frontend application, you may want to use
                       a server-side proxy to avoid CORS issues.
                     </p>
                     <div className="bg-gray-100 p-3 rounded mb-4 overflow-x-auto relative">
