@@ -103,7 +103,31 @@ Self-hosting involves downloading an opensource LLM such as GPT-2 or TinyLlma fr
 
 This final URL can then be accessed via POST requests to perform inference across the sharded LLM securely and efficiently.
 
+### URL and Data Flow
 
+Here's an illustration of this process clearly showing paths and ports:
+
+![Data Diagram](https://github.com/derek2403/TeeTee/blob/main/public/HowItWorks.png?raw=true)
+
+
+**Endpoint Communication Flow (Top Diagram)**:
+
+1. **User Request**: User sends a request to TEE 1 at `TEE1URL/generate` (Port 5002).
+2. **Internal Processing (TEE 1)**: Converts user input into a tensor (machine-readable) internally via the `/process` path.
+3. **Forward to TEE 2**: Processed tensor is sent to TEE 2 at `TEE2URL/generate` (Port 5001).
+4. **TEE 2 Generation**: TEE 2 generates a response from tensor input and sends it back to TEE 1.
+5. **Response Back to User**: TEE 1 returns TEE 2’s output directly back to the user through the original `TEE1URL/generate` endpoint.
+
+**Data Flow with Attestation (Bottom Diagram)**:
+
+1. **User Query**: User submits a query (e.g., \"What is Ethereum?\") to TEE 1.
+2. **TEE 1 Attestation**: TEE 1 processes and converts the query to tensor form and generates an **Attestation Report**, verifying authenticity.
+3. **Data to TEE 2**: TEE 1 forwards this tensor data to TEE 2.
+4. **TEE 2 Processing and Attestation**: TEE 2 processes tensor data, generates a human-readable response, and attaches its own **Attestation Report**.
+5. **Final Response**: TEE 2's output (with attestation) is sent back through TEE 1 to the user. TEE 1 merely acts as a relay with no further processing.
+
+**Why this Design?**  
+Passing responses through TEE 1 ensures users interact with a single endpoint, simplifying integration and improving overall usability and convenience.
 
 
 ---
