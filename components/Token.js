@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { useAccount, useBalance } from 'wagmi';
-import { useDepositToPool } from '../hooks';
+import  useDepositToPool  from '../hooks/useDepositToPool';
 import { ethers } from 'ethers';
 import contractABI from '../utils/ABI.json';
 
