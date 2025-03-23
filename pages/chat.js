@@ -5,6 +5,9 @@ import { Input } from "@heroui/input";
 import { Tabs, Tab } from "@heroui/tabs";
 import { Select, SelectItem } from "@heroui/select";
 import { useAIChat } from '../hooks/useAIChat';
+import { useCheckBalance } from '../hooks';
+import { ethers } from 'ethers';
+import contractABI from '../utils/ABI.json';
 import Dashboard from '../components/Dashboard';
 import Token from '../components/Token';
 
@@ -12,9 +15,32 @@ export default function Chat() {
   const [selectedModel, setSelectedModel] = useState('ollama'); 
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
-  // Mock token balance for UI display only
-  const [tokenBalance, setTokenBalance] = useState("1000");
-  const aiChat = useAIChat();
+  const [contract, setContract] = useState(null);
+  
+  // Initialize contract for token functionality
+  useEffect(() => {
+    const initContract = async () => {
+      if (window.ethereum) {
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const signer = await provider.getSigner();
+          const contractAddress = '0x4785815a0CBA353484D566029471Fa2E4C596a3a';
+          const newContract = new ethers.Contract(contractAddress, contractABI, signer);
+          setContract(newContract);
+          console.log("Contract initialized successfully in chat.js");
+        } catch (error) {
+          console.error("Failed to initialize contract in chat.js:", error);
+        }
+      }
+    };
+    
+    initContract();
+  }, []);
+  
+  // Use the hook to get real token balance
+  const { tokenBalance, fetchTokenBalance } = useCheckBalance(contract);
+  
+  const aiChat = useAIChat({ tokenBalance, isConnected: !!contract });
 
   // Adding a style block to handle hiding scrollbars globally
   useEffect(() => {
@@ -91,59 +117,21 @@ export default function Chat() {
       
       // Immediately fetch the Node1 RA report while waiting for the main response
       try {
-        console.log("Fetching Node1 attestation...");
-        const node1RaResponse = await fetch("/api/ra-report", {
-          headers: {
-            // Force a fresh request instead of using cache
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-        
-        console.log("Node1 RA status:", node1RaResponse.status, node1RaResponse.statusText);
-        
-        // Check if we got a valid response
-        if (!node1RaResponse.ok) {
-          console.error("Node1 RA request failed:", node1RaResponse.status, node1RaResponse.statusText);
-          const errorText = await node1RaResponse.text();
-          console.error("Error details:", errorText);
-          return;  // Don't proceed with processing
-        }
-        
+        const node1RaResponse = await fetch("/api/ra-report");
         const node1RaData = await node1RaResponse.json();
-        console.log("Node1 RA full response:", JSON.stringify(node1RaData, null, 2));
         
-        // Try multiple paths to extract Node1 quote
-        let node1Quote = null;
-        
-        if (node1RaData.node1_attestation?.ra_report?.quote) {
-          node1Quote = node1RaData.node1_attestation.ra_report.quote;
-          console.log("Found Node1 quote in node1_attestation.ra_report.quote");
-        } else if (node1RaData.attestation?.ra_report?.quote) {
-          node1Quote = node1RaData.attestation.ra_report.quote;
-          console.log("Found Node1 quote in attestation.ra_report.quote");
-        } else if (node1RaData.ra_report?.quote) {
-          node1Quote = node1RaData.ra_report.quote;
-          console.log("Found Node1 quote in ra_report.quote");
-        } else {
-          console.log("Available fields in Node1 response:", Object.keys(node1RaData));
-          if (node1RaData.status === "success") {
-            console.log("Node1 success response but no quote found");
-          } else {
-            console.log("Node1 response status not success:", node1RaData.status);
+        if (node1RaData.status === "success") {
+          // Extract the Node1 quote
+          const node1Quote = node1RaData.node1_attestation?.ra_report?.quote || "";
+          console.log("Initial Node1 quote:", node1Quote ? node1Quote.substring(0, 30) + "..." : "none");
+          
+          // Add a message with the Node1 quote
+          if (node1Quote) {
+            aiChat.addMessage("node1-attestation", "Node1 Attestation Report", 0, {
+              node1: node1Quote,
+              node2: ""
+            });
           }
-        }
-        
-        // Add a message with the Node1 quote if found
-        if (node1Quote) {
-          console.log("Adding Node1 attestation message with quote length:", node1Quote.length);
-          aiChat.addMessage("node1-attestation", "Node1 Attestation Report", 0, {
-            node1: node1Quote,
-            node2: ""
-          });
-          console.log("Node1 attestation message added to chat");
-        } else {
-          console.log("No Node1 quote found in the response");
         }
       } catch (error) {
         console.error("Error fetching Node1 RA report:", error);
@@ -240,13 +228,13 @@ export default function Chat() {
               </svg>
             </div>
             
-            {/* Token Display - now displays a dropdown popup instead of full page overlay */}
+            {/* Token Display - now with real token balance */}
             <div className="relative">
               <div 
                 className="px-3 py-1 bg-blue-50 rounded-full text-sm font-medium cursor-pointer"
                 onClick={toggleTokens}
               >
-                Tokens: {tokenBalance}
+                Tokens: {tokenBalance || '0'}
               </div>
               
               {/* Token Dropdown */}
@@ -270,6 +258,8 @@ export default function Chat() {
                     tokenBalance={tokenBalance}
                     onClose={toggleTokens}
                     isDropdown={true}
+                    contract={contract}
+                    fetchTokenBalance={fetchTokenBalance}
                   />
                 </div>
               )}
