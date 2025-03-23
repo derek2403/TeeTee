@@ -132,59 +132,7 @@ export default function Models() {
           </Button>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3 mb-8">
-          <Select
-            label="Publisher"
-            className="w-32"
-            value={publisher}
-            onChange={(e) => setPublisher(e.target.value)}
-          >
-            <SelectItem key="all" value="all">All</SelectItem>
-            <SelectItem key="mistral" value="mistral">Mistral</SelectItem>
-            <SelectItem key="microsoft" value="microsoft">Microsoft</SelectItem>
-            <SelectItem key="openai" value="openai">OpenAI</SelectItem>
-            <SelectItem key="deepseek" value="deepseek">DeepSeek</SelectItem>
-          </Select>
-
-          <Select
-            label="Capability"
-            className="w-32"
-            value={capability}
-            onChange={(e) => setCapability(e.target.value)}
-          >
-            <SelectItem key="all" value="all">All</SelectItem>
-            <SelectItem key="reasoning" value="reasoning">Reasoning</SelectItem>
-            <SelectItem key="coding" value="coding">Coding</SelectItem>
-            <SelectItem key="multimodal" value="multimodal">Multimodal</SelectItem>
-          </Select>
-
-          <Select
-            label="Category"
-            className="w-32"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            <SelectItem key="all" value="all">All</SelectItem>
-            <SelectItem key="large" value="large">Large</SelectItem>
-            <SelectItem key="small" value="small">Small</SelectItem>
-            <SelectItem key="mini" value="mini">Mini</SelectItem>
-          </Select>
-
-          <Select
-            label="Sort"
-            className="w-48"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-          >
-            <SelectItem key="recently_added" value="recently_added">Recently added</SelectItem>
-            <SelectItem key="name_asc" value="name_asc">Name (A-Z)</SelectItem>
-            <SelectItem key="name_desc" value="name_desc">Name (Z-A)</SelectItem>
-            <SelectItem key="size_asc" value="size_asc">Size (smallest first)</SelectItem>
-            <SelectItem key="size_desc" value="size_desc">Size (largest first)</SelectItem>
-          </Select>
-        </div>
-
+        
         {/* Loading state */}
         {loading && (
           <div className="flex justify-center items-center py-12">

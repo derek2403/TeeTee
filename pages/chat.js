@@ -8,7 +8,7 @@ import { useAIChat } from '../hooks/useAIChat';
 import Dashboard from '../components/Dashboard';
 import Token from '../components/Token';
 
-export default function AIChat() {
+export default function Chat() {
   const [selectedModel, setSelectedModel] = useState('ollama'); 
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
@@ -125,12 +125,39 @@ export default function AIChat() {
               </svg>
             </div>
             
-            {/* Token Display - now opens Tokens component instead of Dashboard */}
-            <div 
-              className="px-3 py-1 bg-blue-50 rounded-full text-sm font-medium cursor-pointer"
-              onClick={toggleTokens}
-            >
-              Tokens: {tokenBalance}
+            {/* Token Display - now displays a dropdown popup instead of full page overlay */}
+            <div className="relative">
+              <div 
+                className="px-3 py-1 bg-blue-50 rounded-full text-sm font-medium cursor-pointer"
+                onClick={toggleTokens}
+              >
+                Tokens: {tokenBalance}
+              </div>
+              
+              {/* Token Dropdown */}
+              {showTokens && (
+                <div className="absolute left-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg z-50 overflow-hidden border">
+                  <div className="flex justify-between items-center p-3 border-b">
+                    <h2 className="text-md font-bold">Tokens</h2>
+                    <Button
+                      color="default"
+                      variant="light"
+                      onClick={toggleTokens}
+                      size="sm"
+                      isIconOnly
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </Button>
+                  </div>
+                  <Token 
+                    tokenBalance={tokenBalance}
+                    onClose={toggleTokens}
+                    isDropdown={true}
+                  />
+                </div>
+              )}
             </div>
           </div>
           
@@ -185,29 +212,8 @@ export default function AIChat() {
           </div>
         )}
         
-        {/* Conditional Tokens Overlay - when clicking tokens */}
-        {showTokens && (
-          <div className="absolute inset-0 bg-white z-10 overflow-auto p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Tokens</h2>
-              <Button
-                color="default"
-                variant="light"
-                onClick={toggleTokens}
-                size="sm"
-              >
-                Close
-              </Button>
-            </div>
-            <Token 
-              tokenBalance={tokenBalance}
-              onClose={toggleTokens}
-            />
-          </div>
-        )}
-        
-        {/* Main Chat Content - when no overlay is showing */}
-        {!showDashboard && !showTokens && (
+        {/* Main Chat Content - hide only when dashboard is showing */}
+        {!showDashboard && (
           <>
             {/* Chat Messages - scrollable area */}
             <div className="flex-1 overflow-y-auto p-4">

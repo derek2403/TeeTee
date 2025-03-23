@@ -10,7 +10,7 @@ import { useAccount } from 'wagmi';
 
 export default function ContributionPool() {
   const { isConnected, address } = useAccount();
-  const [selectedModel, setSelectedModel] = useState('llama3');
+  const [selectedModel, setSelectedModel] = useState('tinyllama');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
   const [modalTab, setModalTab] = useState('instructions'); // 'instructions' or 'submit'
@@ -20,8 +20,8 @@ export default function ContributionPool() {
   
   // Mock data for the TEE nodes
   const teeNodes = [
-    { id: 1, status: 'occupied', address: '0x97...A8f1', model: 'llama3' },
-    { id: 2, status: 'empty', model: 'llama3' },
+    { id: 1, status: 'empty', address: '', model: 'TinyLlama-1.1B-Chat-v1.0' },
+    { id: 2, status: 'occupied', address: '0xf1a...9092', model: 'TinyLlama-1.1B-Chat-v1.0' },
   ];
   
   const handleModelChange = (e) => {
@@ -103,10 +103,10 @@ export default function ContributionPool() {
             value={selectedModel}
             onChange={handleModelChange}
           >
-            <SelectItem key="llama3" value="llama3">Llama 3.2 (2 TEE Nodes)</SelectItem>
+            <SelectItem key="tinyllama" value="tinyllama">TinyLlama-1.1B-Chat-v1.0 (2 TEE Nodes)</SelectItem>
           </Select>
           <p className="text-sm text-gray-600 mt-2">
-            More models will be available soon. Currently only Llama 3.2 is supported.
+            More models will be available soon. Currently only TinyLlama-1.1B-Chat-v1.0 is supported.
           </p>
         </div>
         
@@ -127,7 +127,7 @@ export default function ContributionPool() {
                     </div>
                     
                     <h3 className="text-lg font-medium mb-1">TEE Node {node.id}</h3>
-                    <p className="text-sm text-gray-600 mb-3">Model: Llama 3.2</p>
+                    <p className="text-sm text-gray-600 mb-3">Model: TinyLlama-1.1B-Chat-v1.0</p>
                     
                     {node.status === 'occupied' ? (
                       <div className="mt-auto">
@@ -196,7 +196,7 @@ export default function ContributionPool() {
             <Tab key="instructions" title="Setup Instructions">
               <ModalBody>
                 <p>
-                  To host a TEE Node for Llama 3.2, you&apos;ll need to follow our setup instructions on GitHub.
+                  To host a TEE Node for TinyLlama-1.1B-Chat-v1.0, you&apos;ll need to follow our setup instructions on GitHub.
                 </p>
                 <div className="p-4 bg-blue-50 rounded-md my-3">
                   <h3 className="font-medium text-blue-800 mb-2">GitHub Setup Includes:</h3>
