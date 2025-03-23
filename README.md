@@ -1,5 +1,5 @@
 # TeeTee👇
-**LLM Sharing Across Multiple Verifiable TEE with Decentralized Inference**
+**LLM Sharding Across Multiple Verifiable TEE with Decentralized Inference**
 
 ![Logo](https://github.com/derek2403/TeeTee/blob/main/public/logo.png?raw=true)
 
