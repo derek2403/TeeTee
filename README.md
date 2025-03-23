@@ -1,7 +1,7 @@
 # TeeTee
 **LLM Sharing Across Multiple Verifiable TEE with Decentralized Inference**
 
-Logo
+![Logo](https://github.com/derek2403/TeeTee/blob/main/public/logo.png?raw=true)
 
 A breakthrough infrastructure that splits massive large LLM across multiple TEE, allowing organizations to collectively access high-performance AI at a fraction of the cost while maintaining complete data privacy and security.
 
@@ -56,17 +56,39 @@ In short, TeeTee enables contributors to gain access to higher-quality models th
 ---
 
 ## How Our Project Works
+This is done by 2 tracks: either users pay for LLM tokens usage or host their own LLM shard in a TEE.
 
 
----
+### Project Flow 1: Self-Hosting
 
-### Project Flow 1
+1. **Choose Model & Slot**
+   - Select an available slot for hosting half of a Tiny Llama model shard from the Pool Contribution website.
 
+2. **Setup Environment**
+   - Connect your wallet for authentication.
+   - Copy the provided YAML file and host it on Phala Network via [Phala Cloud](https://cloud.phala.network/register?invite=PHALAWIKI).
 
+3. **Finalize Hosting**
+   - After deployment, copy the generated URL from Phala Network.
+   - Our backend verifies the model hash and functionality, and the hash is publicly verifiable for transparency and trust.
+   - After verification, a dashboard will be shown to see the usage of the shard of the model.
 
-### Project Flow 2
+4. **Profit Sharing & Access**
+   - Model shard details are stored in a smart contract, automatically managing profit-sharing of all the users that hosted the LLM shard.
+   - Users who top up their LLM tokens with ETH can utilize their hosted model without additional costs.
 
- 
+### Project Flow 2: Token-Based Usage
+
+1. **Purchase Tokens**
+   - Connect your wallet via the AI Chat interface and buy LLM tokens using ETH.
+
+2. **Use AI Service**
+   - Spend tokens to generate responses directly in AI Chat.
+   - Each query and response cost tokens and require an on-chain transaction signing, ensuring traceability and security.
+
+3. **Verification**
+   - All inputs and outputs have on-chain attestations, visible on Phala's on-chain report explorer, enabling secure verification of responses.
+
 ---
 
 ## Architecture & Tech Stack
