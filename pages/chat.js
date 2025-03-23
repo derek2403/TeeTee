@@ -5,17 +5,19 @@ import { Input } from "@heroui/input";
 import { Tabs, Tab } from "@heroui/tabs";
 import { Select, SelectItem } from "@heroui/select";
 import { useAIChat } from '../hooks/useAIChat';
-import { useCheckBalance } from '../hooks';
+import useCheckBalance from '../hooks/useCheckBalance';
+import useGetAllHostedLLMs from '../hooks/useGetAllHostedLLMs';
 import { ethers } from 'ethers';
 import contractABI from '../utils/ABI.json';
 import Dashboard from '../components/Dashboard';
 import Token from '../components/Token';
 
 export default function Chat() {
-  const [selectedModel, setSelectedModel] = useState('ollama'); 
+  const [selectedModel, setSelectedModel] = useState('llm-0'); 
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
   const [contract, setContract] = useState(null);
+  const [userAddress, setUserAddress] = useState('');
   
   // Initialize contract for token functionality
   useEffect(() => {
@@ -23,8 +25,11 @@ export default function Chat() {
       if (window.ethereum) {
         try {
           const provider = new ethers.BrowserProvider(window.ethereum);
+          const accounts = await provider.send("eth_requestAccounts", []);
+          setUserAddress(accounts[0]);
+          
           const signer = await provider.getSigner();
-          const contractAddress = '0x4785815a0CBA353484D566029471Fa2E4C596a3a';
+          const contractAddress = '0x396061f4eBa244416CA7020FA341F8F6A990D991';
           const newContract = new ethers.Contract(contractAddress, contractABI, signer);
           setContract(newContract);
           console.log("Contract initialized successfully in chat.js");
@@ -37,8 +42,23 @@ export default function Chat() {
     initContract();
   }, []);
   
-  // Use the hook to get real token balance
+  // Use hooks for contract interaction
   const { tokenBalance, fetchTokenBalance } = useCheckBalance(contract);
+  const { llmEntries, totalLLMs, fetchLLMEntries } = useGetAllHostedLLMs(contract);
+  
+  // Fetch LLM entries when contract is loaded
+  useEffect(() => {
+    if (contract) {
+      fetchLLMEntries();
+    }
+  }, [contract]);
+  
+  // Set first LLM as default when entries are loaded
+  useEffect(() => {
+    if (llmEntries && llmEntries.length > 0 && selectedModel === 'ollama') {
+      setSelectedModel(`llm-0`);
+    }
+  }, [llmEntries]);
   
   const aiChat = useAIChat({ tokenBalance, isConnected: !!contract });
 
@@ -87,6 +107,27 @@ export default function Chat() {
   const toggleTokens = () => {
     setShowTokens(!showTokens);
     setShowDashboard(false); // Close dashboard if open
+  };
+
+  // Helper function to check if an LLM is owned by the current user
+  const isOwnedByUser = (llm) => {
+    if (!userAddress) return false;
+    
+    return (
+      userAddress.toLowerCase() === llm.owner1.toLowerCase() ||
+      userAddress.toLowerCase() === llm.owner2.toLowerCase()
+    );
+  };
+
+  // Helper function to format URL for display
+  const formatUrlForDisplay = (url) => {
+    if (!url) return '';
+    
+    // If it's a long URL, truncate it
+    if (url.length > 30) {
+      return url.substring(0, 27) + '...';
+    }
+    return url;
   };
 
   // Generate response without token functionality
@@ -220,12 +261,29 @@ export default function Chat() {
           <div className="flex items-center space-x-3">
             {/* Avatar that opens dashboard when clicked */}
             <div 
-              className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white cursor-pointer"
+              className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white cursor-pointer relative"
               onClick={toggleDashboard}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
+              
+              {/* Dashboard Dropdown */}
+              {showDashboard && (
+                <div className="absolute left-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg z-50 overflow-hidden border">
+                  <div className="flex justify-center items-center p-3 border-b">
+                    <h2 className="text-md font-bold text-black">Dashboard</h2>
+                  </div>
+                  <Dashboard 
+                    tokenBalance={tokenBalance}
+                    aiChat={aiChat}
+                    onClose={toggleDashboard}
+                    contract={contract}
+                    llmEntries={llmEntries}
+                    userAddress={userAddress}
+                  />
+                </div>
+              )}
             </div>
             
             {/* Token Display - now with real token balance */}
@@ -240,19 +298,8 @@ export default function Chat() {
               {/* Token Dropdown */}
               {showTokens && (
                 <div className="absolute left-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg z-50 overflow-hidden border">
-                  <div className="flex justify-between items-center p-3 border-b">
-                    <h2 className="text-md font-bold">Tokens</h2>
-                    <Button
-                      color="default"
-                      variant="light"
-                      onClick={toggleTokens}
-                      size="sm"
-                      isIconOnly
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </Button>
+                  <div className="flex justify-center items-center p-3 border-b">
+                    <h2 className="text-md font-bold text-black">Tokens</h2>
                   </div>
                   <Token 
                     tokenBalance={tokenBalance}
@@ -266,7 +313,7 @@ export default function Chat() {
             </div>
           </div>
           
-          {/* Model Selector */}
+          {/* Model Selector - Shows TinyLlama for all models and marks self-hosted */}
           <Select
             isRequired
             label="Select a model"
@@ -275,8 +322,19 @@ export default function Chat() {
             value={selectedModel}
             onChange={handleModelChange}
           >
-            <SelectItem key="self-hosted" value="self-hosted">Self hosted LLM shard</SelectItem>
-            <SelectItem key="ollama" value="ollama">Ollama 3.2</SelectItem>
+            {/* Display all LLM entries with TinyLlama name */}
+            {llmEntries.map((llm, index) => (
+              <SelectItem 
+                key={`llm-${index}`} 
+                value={`llm-${index}`}
+                textValue={`TinyLlama-1.1B-Chat-v1.0 ${isOwnedByUser(llm) ? "(Self Hosted)" : ""}`}
+              >
+                <div className="flex flex-col">
+                  <span>TinyLlama-1.1B-Chat-v1.0 {isOwnedByUser(llm) ? "(Self Hosted)" : ""}</span>
+                  <span className="text-xs text-gray-500">{formatUrlForDisplay(llm.url)}</span>
+                </div>
+              </SelectItem>
+            ))}
           </Select>
           
           {/* New Chat Button */}
@@ -295,167 +353,143 @@ export default function Chat() {
           </Button>
         </div>
         
-        {/* Conditional Dashboard Overlay - when clicking avatar */}
-        {showDashboard && (
-          <div className="absolute inset-0 bg-white z-10 overflow-auto p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Dashboard</h2>
-              <Button
-                color="default"
-                variant="light"
-                onClick={toggleDashboard}
-                size="sm"
-              >
-                Close
-              </Button>
-            </div>
-            <Dashboard 
-              tokenBalance={tokenBalance}
-              aiChat={aiChat}
-              onClose={toggleDashboard}
-            />
-          </div>
-        )}
-        
-        {/* Main Chat Content - hide only when dashboard is showing */}
-        {!showDashboard && (
-          <>
-            {/* Chat Messages - scrollable area */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {aiChat.messages.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center max-w-md">
-                    <h2 className="text-xl font-semibold mb-3">Welcome to TeeTee</h2>
-                    <p className="text-gray-600 text-sm">
-                      This is a secure AI assistant running in a TEE
-                    </p>
-                  </div>
+        {/* Main Chat Content - REMOVED condition that was hiding content */}
+        <>
+          {/* Chat Messages - scrollable area */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {aiChat.messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center max-w-md">
+                  <h2 className="text-xl font-semibold mb-3">Welcome to TeeTee</h2>
+                  <p className="text-gray-600 text-sm">
+                    This is a secure AI assistant running in a TEE
+                  </p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {aiChat.messages.map((message, index) => {
-                    console.log(`Rendering message ${index}:`, message.role, 
-                                message.role === 'node2-attestation' ? 
-                                `with quote length: ${message.attestationQuotes?.node2?.length || 0}` : '');
-                    return (
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {aiChat.messages.map((message, index) => {
+                  console.log(`Rendering message ${index}:`, message.role, 
+                              message.role === 'node2-attestation' ? 
+                              `with quote length: ${message.attestationQuotes?.node2?.length || 0}` : '');
+                  return (
+                    <div
+                      key={index}
+                      className={`flex ${
+                        message.role === 'user' 
+                          ? 'justify-end' 
+                          : message.role === 'node1-attestation' || message.role === 'node2-attestation'
+                            ? 'justify-center' 
+                            : 'justify-start'
+                      }`}
+                    >
                       <div
-                        key={index}
-                        className={`flex ${
-                          message.role === 'user' 
-                            ? 'justify-end' 
+                        className={`${
+                          message.role === 'user'
+                            ? 'max-w-[70%] bg-blue-600 text-white'
                             : message.role === 'node1-attestation' || message.role === 'node2-attestation'
-                              ? 'justify-center' 
-                              : 'justify-start'
-                        }`}
+                              ? 'max-w-[85%] bg-green-50 border border-green-200'
+                              : 'max-w-[70%] bg-gray-100 text-gray-800'
+                        } p-3 rounded-lg`}
                       >
-                        <div
-                          className={`${
-                            message.role === 'user'
-                              ? 'max-w-[70%] bg-blue-600 text-white'
-                              : message.role === 'node1-attestation' || message.role === 'node2-attestation'
-                                ? 'max-w-[85%] bg-green-50 border border-green-200'
-                                : 'max-w-[70%] bg-gray-100 text-gray-800'
-                          } p-3 rounded-lg`}
-                        >
-                          {message.role === 'node1-attestation' ? (
-                            <div className="text-xs">
-                              <div className="flex items-center justify-between">
-                                <div className="font-semibold text-green-700 flex items-center">
-                                  <span>Node1 Attestation:</span>
-                                  <span className="font-mono ml-2 truncate max-w-[200px]">
-                                    {message.attestationQuotes.node1.substring(0, 30)}...
-                                  </span>
-                                </div>
-                                <button 
-                                  onClick={() => {navigator.clipboard.writeText(message.attestationQuotes.node1)}}
-                                  className="p-1 hover:bg-gray-200 rounded ml-2"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                  </svg>
-                                </button>
+                        {message.role === 'node1-attestation' ? (
+                          <div className="text-xs">
+                            <div className="flex items-center justify-between">
+                              <div className="font-semibold text-green-700 flex items-center">
+                                <span>Node1 Attestation:</span>
+                                <span className="font-mono ml-2 truncate max-w-[200px]">
+                                  {message.attestationQuotes.node1.substring(0, 30)}...
+                                </span>
                               </div>
+                              <button 
+                                onClick={() => {navigator.clipboard.writeText(message.attestationQuotes.node1)}}
+                                className="p-1 hover:bg-gray-200 rounded ml-2"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              </button>
                             </div>
-                          ) : message.role === 'node2-attestation' ? (
-                            <div className="text-xs">
-                              <div className="flex items-center justify-between">
-                                <div className="font-semibold text-green-700 flex items-center">
-                                  <span>Node2 Attestation:</span>
-                                  <span className="font-mono ml-2 truncate max-w-[200px]">
-                                    {message.attestationQuotes.node2.substring(0, 30)}...
-                                  </span>
-                                </div>
-                                <button 
-                                  onClick={() => {navigator.clipboard.writeText(message.attestationQuotes.node2)}}
-                                  className="p-1 hover:bg-gray-200 rounded ml-2"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                  </svg>
-                                </button>
+                          </div>
+                        ) : message.role === 'node2-attestation' ? (
+                          <div className="text-xs">
+                            <div className="flex items-center justify-between">
+                              <div className="font-semibold text-green-700 flex items-center">
+                                <span>Node2 Attestation:</span>
+                                <span className="font-mono ml-2 truncate max-w-[200px]">
+                                  {message.attestationQuotes.node2.substring(0, 30)}...
+                                </span>
                               </div>
+                              <button 
+                                onClick={() => {navigator.clipboard.writeText(message.attestationQuotes.node2)}}
+                                className="p-1 hover:bg-gray-200 rounded ml-2"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              </button>
                             </div>
-                          ) : (
-                            <>
-                              <p className="whitespace-pre-line text-sm break-words">{message.content}</p>
-                              {message.tokens > 0 && (
-                                <div className="mt-1 text-xs opacity-80 text-right">
-                                  {message.tokens} tokens
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Pending message */}
-                  {aiChat.isGenerating && (
-                    <div className="flex justify-start">
-                      <div className="max-w-[70%] p-3 rounded-lg bg-gray-100">
-                        <div className="flex space-x-2 items-center">
-                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-200"></div>
-                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-500"></div>
-                        </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="whitespace-pre-line text-sm break-words">{message.content}</p>
+                            {message.tokens > 0 && (
+                              <div className="mt-1 text-xs opacity-80 text-right">
+                                {message.tokens} tokens
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
+                  );
+                })}
 
-            {/* Input Area - at the bottom */}
-            <div className="p-4 border-t">
-              <div className="flex items-center gap-2">
-                <Input
-                  className="flex-1"
-                  type="text"
-                  value={aiChat.inputText}
-                  onChange={aiChat.handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Type your message here..."
-                  disabled={aiChat.isGenerating}
-                  size="md"
-                  radius="lg"
-                />
-                <Button
-                  color="primary"
-                  disabled={!aiChat.inputText.trim() || aiChat.isGenerating}
-                  onClick={generateResponse}
-                  radius="lg"
-                  isIconOnly
-                  size="md"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                    <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
-                  </svg>
-                </Button>
+                {/* Pending message */}
+                {aiChat.isGenerating && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[70%] p-3 rounded-lg bg-gray-100">
+                      <div className="flex space-x-2 items-center">
+                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-200"></div>
+                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-500"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+            )}
+          </div>
+
+          {/* Input Area - at the bottom */}
+          <div className="p-4 border-t">
+            <div className="flex items-center gap-2">
+              <Input
+                className="flex-1"
+                type="text"
+                value={aiChat.inputText}
+                onChange={aiChat.handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Type your message here..."
+                disabled={aiChat.isGenerating}
+                size="md"
+                radius="lg"
+              />
+              <Button
+                color="primary"
+                disabled={!aiChat.inputText.trim() || aiChat.isGenerating}
+                onClick={generateResponse}
+                radius="lg"
+                isIconOnly
+                size="md"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                  <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+                </svg>
+              </Button>
             </div>
-          </>
-        )}
+          </div>
+        </>
       </div>
     </div>
   );
