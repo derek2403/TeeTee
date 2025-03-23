@@ -6,11 +6,9 @@ export default function useEditHostedLLM(contract, address, fetchLLMEntries) {
   const [resultMessage, setResultMessage] = useState('');
   const [editLLMData, setEditLLMData] = useState({
     llmId: '',
-    name: '',
-    description: '',
     owner1: '',
     owner2: '',
-    price: '',
+    url: '',
   });
 
   const handleEditLLMFormChange = (e) => {
@@ -51,24 +49,17 @@ export default function useEditHostedLLM(contract, address, fetchLLMEntries) {
         setIsEditingLLM(false);
         return;
       }
-
-      // Prepare updated values
-      const name = editLLMData.name || currentLLM.name;
-      const description = editLLMData.description || currentLLM.description;
       
       // Handle owner addresses
       let owner1 = editLLMData.owner1;
       let owner2 = editLLMData.owner2;
       
-      // If owner1 is "0", keep the current value
-      if (owner1 === "0") {
-        owner1 = currentLLM.owner1;
-      } else if (!owner1) {
-        // If empty, use current value
-        owner1 = currentLLM.owner1;
+      // If owner1 is "0", use Zero Address to keep current value
+      if (owner1 === "0" || !owner1) {
+        owner1 = ethers.ZeroAddress;
       } else {
         // Validate address format
-        if (!ethers.utils.isAddress(owner1)) {
+        if (!ethers.isAddress(owner1)) {
           setResultMessage('Invalid owner1 address format');
           setIsEditingLLM(false);
           return;
@@ -76,40 +67,28 @@ export default function useEditHostedLLM(contract, address, fetchLLMEntries) {
       }
       
       // Same logic for owner2
-      if (owner2 === "0") {
-        owner2 = currentLLM.owner2;
-      } else if (!owner2) {
-        owner2 = currentLLM.owner2;
+      if (owner2 === "0" || !owner2) {
+        owner2 = ethers.ZeroAddress;
       } else {
-        if (!ethers.utils.isAddress(owner2)) {
+        if (!ethers.isAddress(owner2)) {
           setResultMessage('Invalid owner2 address format');
           setIsEditingLLM(false);
           return;
         }
       }
       
-      // Handle price update
-      let priceInWei;
-      if (editLLMData.price) {
-        try {
-          priceInWei = ethers.utils.parseEther(editLLMData.price);
-        } catch (error) {
-          setResultMessage('Invalid price format');
-          setIsEditingLLM(false);
-          return;
-        }
-      } else {
-        priceInWei = currentLLM.price;
+      // Handle URL update
+      let url = editLLMData.url;
+      if (!url || url === "0") {
+        url = "0"; // Special value for "no change" in contract
       }
 
       // Update the LLM entry
       const tx = await contract.editHostedLLM(
         llmId,
-        name,
-        description,
         owner1,
         owner2,
-        priceInWei
+        url
       );
 
       await tx.wait();
@@ -117,11 +96,9 @@ export default function useEditHostedLLM(contract, address, fetchLLMEntries) {
       // Reset form and update state
       setEditLLMData({
         llmId: '',
-        name: '',
-        description: '',
         owner1: '',
         owner2: '',
-        price: '',
+        url: '',
       });
       
       setResultMessage('LLM updated successfully!');

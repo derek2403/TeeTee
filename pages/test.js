@@ -152,18 +152,29 @@ export default function TestPage() {
   // Set global result message by watching hook messages
   useEffect(() => {
     // Priority order for messages
-    if (isCreatingLLM.resultMessage) setResultMessage(isCreatingLLM.resultMessage);
-    else if (isEditingLLM.resultMessage) setResultMessage(isEditingLLM.resultMessage);
-    else if (isDepositing.resultMessage) setResultMessage(isDepositing.resultMessage);
-    else if (isWithdrawing.resultMessage) setResultMessage(isWithdrawing.resultMessage);
-    else if (isSpendingTokens.resultMessage) setResultMessage(isSpendingTokens.resultMessage);
+    if (isCreatingLLM?.resultMessage) setResultMessage(isCreatingLLM.resultMessage);
+    else if (isEditingLLM?.resultMessage) setResultMessage(isEditingLLM.resultMessage);
+    else if (isDepositing?.resultMessage) setResultMessage(isDepositing.resultMessage);
+    else if (isWithdrawing?.resultMessage) setResultMessage(isWithdrawing.resultMessage);
+    else if (isSpendingTokens?.resultMessage) setResultMessage(isSpendingTokens.resultMessage);
   }, [
-    isCreatingLLM.resultMessage,
-    isEditingLLM.resultMessage,
-    isDepositing.resultMessage,
-    isWithdrawing.resultMessage,
-    isSpendingTokens.resultMessage
+    isCreatingLLM?.resultMessage,
+    isEditingLLM?.resultMessage,
+    isDepositing?.resultMessage,
+    isWithdrawing?.resultMessage,
+    isSpendingTokens?.resultMessage
   ]);
+
+  // Helper function for safe BigNumber formatting
+  const safeFormatEther = (value) => {
+    if (!value) return "0";
+    try {
+      return ethers.formatEther(value);
+    } catch (error) {
+      console.error("Error formatting BigNumber:", error);
+      return "0";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -212,11 +223,9 @@ export default function TestPage() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner 1</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner 2</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pool Balance</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
@@ -225,25 +234,19 @@ export default function TestPage() {
                       {llmEntries.map((llm, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{index}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {llm.name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {llm.description && llm.description.length > 30 
-                              ? `${llm.description.substring(0, 30)}...` 
-                              : llm.description}
-                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
                             {llm.owner1.substring(0, 8)}...{llm.owner1.substring(llm.owner1.length - 6)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
                             {llm.owner2.substring(0, 8)}...{llm.owner2.substring(llm.owner2.length - 6)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {ethers.formatEther(llm.price)} ETH
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 overflow-hidden text-ellipsis" style={{ maxWidth: '200px' }}>
+                            <a href={llm.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              {llm.url.length > 30 ? `${llm.url.substring(0, 30)}...` : llm.url}
+                            </a>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {ethers.formatEther(llm.poolBalance)} ETH
+                            {safeFormatEther(llm.poolBalance)} ETH
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <button 
@@ -257,17 +260,30 @@ export default function TestPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                  </div>
               ) : (
                 <p className="text-gray-500">No LLM entries found. Create one below.</p>
-              )}
-            </div>
-            
+                )}
+              </div>
+              
             {/* User Deposit Section */}
             <div className="p-4 border rounded-lg bg-purple-50">
               <h2 className="text-xl font-semibold mb-4">Purchase Tokens</h2>
               <p className="text-sm text-gray-600 mb-3">Deposit ETH to purchase tokens. For every 0.002 ETH, you'll receive 100,000 tokens.</p>
               <form onSubmit={(e) => { e.preventDefault(); handleDeposit(); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">LLM ID</label>
+                  <input
+                    type="number"
+                    name="llmId"
+                    value={depositData.llmId}
+                    onChange={handleDepositFormChange}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="0"
+                    required
+                  />
+                  <p className="text-sm text-gray-500 mt-1">Use the "Select" button above to fill this automatically</p>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Amount (ETH, min 0.002)</label>
                   <input
@@ -285,13 +301,13 @@ export default function TestPage() {
                       Math.floor((parseFloat(depositData.amount) / 0.002) * 100000) : 0} tokens
                   </p>
                 </div>
-                <button
+                    <button
                   type="submit"
                   disabled={isDepositing}
                   className="w-full px-6 py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-400"
                 >
                   {isDepositing ? 'Processing...' : 'Deposit & Get Tokens'}
-                </button>
+                    </button>
               </form>
             </div>
             
@@ -332,28 +348,17 @@ export default function TestPage() {
               <h2 className="text-xl font-semibold mb-4">Create New Hosted LLM</h2>
               <form onSubmit={(e) => { e.preventDefault(); handleCreateLLM(); }} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
                   <input
-                    type="text"
-                    name="name"
-                    value={newLLMData.name}
+                    type="url"
+                    name="url"
+                    value={newLLMData.url}
                     onChange={handleCreateLLMFormChange}
                     className="w-full p-2 border rounded-md"
-                    placeholder="LLM Name"
+                    placeholder="https://example.com"
                     required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                  <textarea
-                    name="description"
-                    value={newLLMData.description}
-                    onChange={handleCreateLLMFormChange}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="LLM Description"
-                    required
-                  />
-                </div>
+                    </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Owner 1 Address</label>
@@ -379,20 +384,7 @@ export default function TestPage() {
                     />
                     <p className="text-sm text-gray-500 mt-1">Leave blank to use your address</p>
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price (ETH)</label>
-                  <input
-                    type="number"
-                    name="price"
-                    value={newLLMData.price}
-                    onChange={handleCreateLLMFormChange}
-                    step="0.001"
-                    min="0.001"
-                    className="w-full p-2 border rounded-md"
-                    required
-                  />
-                </div>
+                  </div>
                 <button
                   type="submit"
                   disabled={isCreatingLLM}
@@ -421,24 +413,14 @@ export default function TestPage() {
                   <p className="text-sm text-gray-500 mt-1">Use the "Select" button above to fill this automatically</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">New Name (optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New URL (optional)</label>
                   <input
-                    type="text"
-                    name="name"
-                    value={editLLMData.name}
+                    type="url"
+                    name="url"
+                    value={editLLMData.url}
                     onChange={handleEditLLMFormChange}
                     className="w-full p-2 border rounded-md"
-                    placeholder="Leave blank to keep current"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">New Description (optional)</label>
-                  <textarea
-                    name="description"
-                    value={editLLMData.description}
-                    onChange={handleEditLLMFormChange}
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Leave blank to keep current"
+                    placeholder="Leave blank or enter 0 to keep current"
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -463,20 +445,7 @@ export default function TestPage() {
                       className="w-full p-2 border rounded-md"
                       placeholder="Leave blank or enter 0 to keep current"
                     />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">New Price (optional)</label>
-                  <input
-                    type="number"
-                    name="price"
-                    value={editLLMData.price}
-                    onChange={handleEditLLMFormChange}
-                    step="0.001"
-                    min="0.001"
-                    className="w-full p-2 border rounded-md"
-                    placeholder="Leave blank to keep current"
-                  />
+              </div>
                 </div>
                 <button
                   type="submit"
@@ -495,32 +464,58 @@ export default function TestPage() {
               <form onSubmit={(e) => { e.preventDefault(); handleWithdraw(); }} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">LLM ID</label>
-                  <input
-                    type="number"
+                      <input
+                        type="number"
                     name="llmId"
                     value={withdrawData.llmId}
                     onChange={handleWithdrawFormChange}
-                    className="w-full p-2 border rounded-md"
+                        className="w-full p-2 border rounded-md"
                     placeholder="0"
                     required
-                  />
-                </div>
+                      />
+                    </div>
                 <div className="mb-4">
                   <p className="text-sm font-medium text-gray-700">
-                    Selected Pool Balance: {withdrawData.llmId && !isNaN(parseInt(withdrawData.llmId)) && parseInt(withdrawData.llmId) < llmEntries.length 
-                      ? `${ethers.formatEther(llmEntries[parseInt(withdrawData.llmId)].poolBalance)} ETH` 
+                    Selected Pool Balance: {withdrawData.llmId && !isNaN(parseInt(withdrawData.llmId)) && 
+                      parseInt(withdrawData.llmId) < llmEntries.length && llmEntries[parseInt(withdrawData.llmId)]
+                      ? `${safeFormatEther(llmEntries[parseInt(withdrawData.llmId)].poolBalance)} ETH` 
                       : "0 ETH"}
                   </p>
+                  
+                  {/* Debug info */}
+                  {withdrawData.llmId && !isNaN(parseInt(withdrawData.llmId)) && 
+                   parseInt(withdrawData.llmId) < llmEntries.length && llmEntries[parseInt(withdrawData.llmId)] && (
+                    <div className="mt-2 p-2 bg-red-100 rounded text-xs">
+                      <p><strong>Debug Info:</strong></p>
+                      <p>Owner 1: {llmEntries[parseInt(withdrawData.llmId)].owner1}</p>
+                      <p>Owner 2: {llmEntries[parseInt(withdrawData.llmId)].owner2}</p>
+                      <p>Pool Balance (wei): {llmEntries[parseInt(withdrawData.llmId)].poolBalance.toString()}</p>
+                      <p>Owner 1 is zero address: {llmEntries[parseInt(withdrawData.llmId)].owner1 === ethers.ZeroAddress ? "Yes" : "No"}</p>
+                      <p>Owner 2 is zero address: {llmEntries[parseInt(withdrawData.llmId)].owner2 === ethers.ZeroAddress ? "Yes" : "No"}</p>
+                    </div>
+                  )}
                 </div>
                 <button
                   type="submit"
-                  disabled={isWithdrawing || !withdrawData.llmId || (withdrawData.llmId && !isNaN(parseInt(withdrawData.llmId)) && parseInt(withdrawData.llmId) < llmEntries.length && llmEntries[parseInt(withdrawData.llmId)].poolBalance.toString() === '0')}
+                  disabled={
+                    isWithdrawing || 
+                    !withdrawData.llmId || 
+                    !llmEntries || 
+                    !withdrawData.llmId || 
+                    isNaN(parseInt(withdrawData.llmId)) || 
+                    parseInt(withdrawData.llmId) >= llmEntries.length || 
+                    !llmEntries[parseInt(withdrawData.llmId)] || 
+                    !llmEntries[parseInt(withdrawData.llmId)].poolBalance || 
+                    llmEntries[parseInt(withdrawData.llmId)].poolBalance.toString() === '0' ||
+                    llmEntries[parseInt(withdrawData.llmId)].owner1 === ethers.ZeroAddress ||
+                    llmEntries[parseInt(withdrawData.llmId)].owner2 === ethers.ZeroAddress
+                  }
                   className="w-full px-6 py-3 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400"
                 >
                   {isWithdrawing ? 'Withdrawing...' : 'Withdraw & Split Between Owners'}
                 </button>
               </form>
-            </div>
+              </div>
           </div>
         )}
       </div>
