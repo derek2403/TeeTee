@@ -218,13 +218,7 @@ const Token = ({ tokenBalance, onClose, isDropdown = false, contract: externalCo
           {resultMessage}
         </div>
       )}
-      
-      {/* Debug info for development */}
-      <div className="px-4 mb-2 text-xs text-gray-400">
-        Contract loaded: {contract ? 'Yes' : 'No'} | 
-        Wallet connected: {isConnected ? 'Yes' : 'No'} | 
-        LLM ID: {depositData.llmId || '0'}
-      </div>
+
       
       {/* Purchase button */}
       <div className="px-4 pb-4">
