@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import contractABI from '../utils/ABI.json';
-import {
-  useCheckBalance,
-  useCreateHostedLLM,
-  useDepositToPool,
-  useEditHostedLLM,
-  useGetAllHostedLLMs,
-  useUseTokens,
-  useWithdrawFromPool,
-} from '../hooks';
+import useRemoveHostedLLM from '../hooks/useRemoveHostedLLM';
+import useWithdrawFromPool from '../hooks/useWithdrawFromPool';
+import useUseTokens from '../hooks/useUseTokens';
+import useEditHostedLLM from '../hooks/useEditHostedLLM';
+import useGetAllHostedLLMs from '../hooks/useGetAllHostedLLMs';
+import useDepositToPool from '../hooks/useDepositToPool';
+import useCheckBalance from '../hooks/useCheckBalance';
+import useCreateHostedLLM from '../hooks/useCreateHostedLLM';
+
 
 export default function TestPage() {
   // State variables
@@ -22,7 +22,7 @@ export default function TestPage() {
   const [resultMessage, setResultMessage] = useState('');
   
   // Contract address - adjust this to match your deployed contract
-  const contractAddress = '0x4785815a0CBA353484D566029471Fa2E4C596a3a';
+  const contractAddress = '0x396061f4eBa244416CA7020FA341F8F6A990D991';
   
   // Custom hooks
   const { tokenBalance, fetchTokenBalance } = useCheckBalance(contract);
@@ -57,6 +57,13 @@ export default function TestPage() {
     handleSpendTokensFormChange, 
     handleSpendTokens 
   } = useUseTokens(contract, address, fetchTokenBalance);
+  const {
+    isRemoving,
+    removeData,
+    handleRemoveFormChange,
+    handleRemove,
+    resultMessage: removeResultMessage,
+  } = useRemoveHostedLLM(contract, fetchLLMEntries);
   
   // Connect wallet
   const connectWallet = async () => {
@@ -108,10 +115,11 @@ export default function TestPage() {
   
   // Fill edit form with selected LLM data
   const handleSelectLLM = (index) => {
-    // Set LLM ID for edit, deposit, and withdraw forms
+    // Set LLM ID for edit, deposit, withdraw, and remove forms
     handleEditLLMFormChange({ target: { name: 'llmId', value: index.toString() } });
     handleDepositFormChange({ target: { name: 'llmId', value: index.toString() } });
     handleWithdrawFormChange({ target: { name: 'llmId', value: index.toString() } });
+    handleRemoveFormChange({ target: { name: 'llmId', value: index.toString() } });
   };
   
   // Init effect - check if wallet already connected
@@ -157,12 +165,14 @@ export default function TestPage() {
     else if (isDepositing?.resultMessage) setResultMessage(isDepositing.resultMessage);
     else if (isWithdrawing?.resultMessage) setResultMessage(isWithdrawing.resultMessage);
     else if (isSpendingTokens?.resultMessage) setResultMessage(isSpendingTokens.resultMessage);
+    else if (removeResultMessage) setResultMessage(removeResultMessage);
   }, [
     isCreatingLLM?.resultMessage,
     isEditingLLM?.resultMessage,
     isDepositing?.resultMessage,
     isWithdrawing?.resultMessage,
-    isSpendingTokens?.resultMessage
+    isSpendingTokens?.resultMessage,
+    removeResultMessage
   ]);
 
   // Helper function for safe BigNumber formatting
@@ -515,7 +525,58 @@ export default function TestPage() {
                   {isWithdrawing ? 'Withdrawing...' : 'Withdraw & Split Between Owners'}
                 </button>
               </form>
-              </div>
+            </div>
+
+            {/* Remove LLM */}
+            <div className="p-4 border rounded-lg bg-pink-50">
+              <h2 className="text-xl font-semibold mb-4">Remove Hosted LLM</h2>
+              <p className="text-sm text-gray-600 mb-3">Remove a Hosted LLM entry from the contract. The pool balance must be zero.</p>
+              <form onSubmit={(e) => { e.preventDefault(); handleRemove(); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">LLM ID</label>
+                  <input
+                    type="number"
+                    name="llmId"
+                    value={removeData.llmId}
+                    onChange={handleRemoveFormChange}
+                    className="w-full p-2 border rounded-md"
+                    placeholder="0"
+                    required
+                  />
+                  <p className="text-sm text-gray-500 mt-1">Use the "Select" button above to fill this automatically</p>
+                </div>
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-gray-700">
+                    Selected Pool Balance: {removeData.llmId && !isNaN(parseInt(removeData.llmId)) && 
+                      parseInt(removeData.llmId) < llmEntries.length && llmEntries[parseInt(removeData.llmId)]
+                      ? `${safeFormatEther(llmEntries[parseInt(removeData.llmId)].poolBalance)} ETH` 
+                      : "0 ETH"}
+                  </p>
+                  {removeData.llmId && !isNaN(parseInt(removeData.llmId)) && 
+                   parseInt(removeData.llmId) < llmEntries.length && llmEntries[parseInt(removeData.llmId)] &&
+                   llmEntries[parseInt(removeData.llmId)].poolBalance.toString() !== '0' && (
+                    <p className="text-sm text-red-600 mt-1">
+                      Warning: Pool balance must be zero to remove this LLM. Withdraw funds first.
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={
+                    isRemoving || 
+                    !removeData.llmId || 
+                    !llmEntries || 
+                    isNaN(parseInt(removeData.llmId)) || 
+                    parseInt(removeData.llmId) >= llmEntries.length || 
+                    !llmEntries[parseInt(removeData.llmId)] || 
+                    llmEntries[parseInt(removeData.llmId)].poolBalance.toString() !== '0'
+                  }
+                  className="w-full px-6 py-3 bg-pink-600 text-white rounded-md hover:bg-pink-700 disabled:bg-gray-400"
+                >
+                  {isRemoving ? 'Removing...' : 'Remove Hosted LLM'}
+                </button>
+              </form>
+            </div>
           </div>
         )}
       </div>

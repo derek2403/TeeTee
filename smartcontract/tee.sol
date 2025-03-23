@@ -24,6 +24,7 @@ contract HostedLLM {
     // Events for logging
     event HostedLLMCreated(uint256 indexed llmId, address owner1, address owner2, string url);
     event HostedLLMEdited(uint256 indexed llmId, address owner1, address owner2, string url);
+    event HostedLLMRemoved(uint256 indexed llmId);
     event PoolDeposited(uint256 indexed llmId, uint256 amount);
     event PoolWithdrawn(uint256 indexed llmId, uint256 amount, address to1, address to2);
     event TokensPurchased(address indexed user, uint256 ethAmount, uint256 tokenAmount);
@@ -81,6 +82,25 @@ contract HostedLLM {
         }
         
         emit HostedLLMEdited(llmId, entry.owner1, entry.owner2, entry.url);
+    }
+
+    /**
+     * @dev Remove a HostedLLM entry if its pool balance is zero.
+     * @param llmId The ID of the HostedLLM entry to remove.
+     */
+    function removeHostedLLM(uint256 llmId) external {
+        require(llmId < hostedLLMs.length, "Invalid LLM id");
+        require(hostedLLMs[llmId].poolBalance == 0, "Pool balance must be zero");
+
+        // If this is not the last element, move the last element to the position of the removed one
+        if (llmId < hostedLLMs.length - 1) {
+            hostedLLMs[llmId] = hostedLLMs[hostedLLMs.length - 1];
+        }
+
+        // Remove the last element
+        hostedLLMs.pop();
+        
+        emit HostedLLMRemoved(llmId);
     }
 
     /**
