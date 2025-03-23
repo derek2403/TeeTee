@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react';
 import { Card, CardBody } from "@heroui/card";
-import { Select, SelectItem } from "@heroui/select";
 import { Button } from "@heroui/button";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
 import { Input, Textarea } from "@heroui/input";
-import Image from 'next/image';
 import InstructionsModal from '../components/InstructionsModal';
+import { ethers } from 'ethers';
+import contractABI from '../utils/ABI.json';
+import useGetAllHostedLLMs from '../hooks/useGetAllHostedLLMs';
 
 export default function Models() {
-  const [publisher, setPublisher] = useState('all');
-  const [capability, setCapability] = useState('all');
-  const [category, setCategory] = useState('all');
-  const [sortBy, setSortBy] = useState('recently_added');
-  const [models, setModels] = useState([]);
+
+  const [modelMetadata, setModelMetadata] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
+  const [address, setAddress] = useState('');
+  const [provider, setProvider] = useState(null);
+  const [signer, setSigner] = useState(null);
+  const [contract, setContract] = useState(null);
   
   // Create Pool Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,8 +24,7 @@ export default function Models() {
     name: '',
     description: '',
     modelUrl: '',
-    icon: '',
-    numberOfNodes: 1, // Default to 1 node required
+    icon: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -30,23 +32,126 @@ export default function Models() {
   const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState(null);
   
+  // Contract address - adjust this to match your deployed contract
+  const contractAddress = '0x396061f4eBa244416CA7020FA341F8F6A990D991';
+  
+  // Get blockchain data with the hook
+  const { llmEntries, totalLLMs, fetchLLMEntries } = useGetAllHostedLLMs(contract);
+  
+  // Connect wallet
+  const connectWallet = async () => {
+    try {
+      if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.send("eth_requestAccounts", []);
+        const signer = await provider.getSigner();
+        const contract = new ethers.Contract(contractAddress, contractABI, signer);
+        
+        setProvider(provider);
+        setSigner(signer);
+        setContract(contract);
+        setAddress(accounts[0]);
+        setIsConnected(true);
+        
+        // Setup listeners for account changes
+        window.ethereum.on("accountsChanged", handleAccountsChanged);
+      } else {
+        console.log("No ethereum object found. Please install MetaMask.");
+      }
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+    }
+  };
+  
+  // Handle account changes
+  const handleAccountsChanged = async (accounts) => {
+    if (accounts.length === 0) {
+      // User disconnected wallet
+      setIsConnected(false);
+      setAddress('');
+    } else {
+      // User switched account
+      setAddress(accounts[0]);
+    }
+  };
+  
   useEffect(() => {
-    // Fetch models from API
-    const fetchModels = async () => {
+    // Fetch model metadata from JSON file
+    const fetchModelMetadata = async () => {
       try {
         const response = await fetch('/api/models');
         if (!response.ok) throw new Error('Failed to fetch models');
         const data = await response.json();
-        setModels(data);
+        // We only expect one model in the array, so take the first item
+        setModelMetadata(data[0]);
       } catch (error) {
-        console.error('Error fetching models:', error);
-      } finally {
-        setLoading(false);
+        console.error('Error fetching model metadata:', error);
       }
     };
     
-    fetchModels();
+    fetchModelMetadata();
+    
+    // Check if wallet already connected
+    const checkConnection = async () => {
+      if (window.ethereum) {
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const accounts = await provider.listAccounts();
+          
+          if (accounts.length > 0) {
+            connectWallet();
+          }
+        } catch (error) {
+          console.error("Error checking connection:", error);
+        }
+      }
+    };
+    
+    checkConnection();
+    
+    // Cleanup
+    return () => {
+      if (window.ethereum) {
+        window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
+      }
+    };
   }, []);
+  
+  // Fetch blockchain data when connected
+  useEffect(() => {
+    if (isConnected && contract) {
+      fetchLLMEntries();
+      setLoading(false);
+    }
+  }, [isConnected, contract]);
+  
+  // Combine blockchain data with metadata
+  const combineModelData = () => {
+    if (!llmEntries || llmEntries.length === 0 || !modelMetadata) {
+      return [];
+    }
+    
+    // Use the same metadata for all entries
+    return llmEntries.map((llmEntry, index) => {
+      return {
+        id: index,
+        name: modelMetadata.name,
+        description: modelMetadata.description,
+        owner1: llmEntry.owner1,
+        owner2: llmEntry.owner2,
+        url: llmEntry.url,
+        poolBalance: llmEntry.poolBalance,
+        // Calculate number of valid addresses (exclude 0x0000000000000000000000000000000000000001)
+        hostAddresses: [
+          llmEntry.owner1 !== "0x0000000000000000000000000000000000000001" ? llmEntry.owner1 : null,
+          llmEntry.owner2 !== "0x0000000000000000000000000000000000000001" ? llmEntry.owner2 : null
+        ].filter(Boolean),
+        numberOfNodes: 2 // Fixed at 2 since the contract has owner1 and owner2
+      };
+    });
+  };
+  
+  const combinedModels = combineModelData();
   
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -57,48 +162,42 @@ export default function Models() {
   };
   
   const handleCreatePool = async () => {
-    if (!newModel.name || !newModel.modelUrl || !newModel.numberOfNodes) {
-      alert('Please fill in all required fields');
-      return;
-    }
-    
-    // Ensure numberOfNodes is a number and at least 1
-    const numberOfNodes = parseInt(newModel.numberOfNodes);
-    if (isNaN(numberOfNodes) || numberOfNodes < 1) {
-      alert('Number of hosts must be at least 1');
+    if (!newModel.modelUrl) {
+      alert('Please fill in the model URL');
       return;
     }
     
     setIsSubmitting(true);
     
     try {
-      const response = await fetch('/api/models', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ...newModel,
-          numberOfNodes: numberOfNodes
-        })
-      });
+      // Call the smart contract's createHostedLLM function
+      if (!contract) {
+        throw new Error("Contract not initialized. Please connect your wallet.");
+      }
       
-      if (!response.ok) throw new Error('Failed to create model pool');
+      // Use the current address as owner1 and default address as owner2
+      const tx = await contract.createHostedLLM(
+        address, 
+        "0x0000000000000000000000000000000000000001", // Default placeholder address for owner2
+        newModel.modelUrl
+      );
+      
+      await tx.wait();
+      
+      // Refresh the list
+      await fetchLLMEntries();
       
       // Reset form and close modal
-      const createdModel = await response.json();
-      setModels(prev => [...prev, createdModel]);
       setNewModel({
         name: '',
         description: '',
         modelUrl: '',
-        icon: '',
-        numberOfNodes: 1
+        icon: ''
       });
       setIsModalOpen(false);
     } catch (error) {
       console.error('Error creating model pool:', error);
-      alert('Failed to create model pool');
+      alert('Failed to create model pool: ' + error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -116,6 +215,17 @@ export default function Models() {
     return addr.slice(0, 6) + '...' + addr.slice(-4);
   };
 
+  // Helper function for safe BigNumber formatting
+  const safeFormatEther = (value) => {
+    if (!value) return "0";
+    try {
+      return ethers.formatEther(value);
+    } catch (error) {
+      console.error("Error formatting BigNumber:", error);
+      return "0";
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-6xl mx-auto">
@@ -127,11 +237,10 @@ export default function Models() {
               <a href="#" className="text-blue-600 ml-1">Learn more</a>.
             </p>
           </div>
-          <Button color="primary" onClick={() => setIsModalOpen(true)}>
-            Create Pool
-          </Button>
+         
         </div>
 
+       
         
         {/* Loading state */}
         {loading && (
@@ -143,10 +252,9 @@ export default function Models() {
         {/* Models Grid */}
         {!loading && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {models.map((model) => (
-              <div onClick={() => handleModelClick(model)}>
+            {combinedModels.map((model) => (
+              <div key={model.id} onClick={() => handleModelClick(model)}>
                 <Card 
-                  key={model.id} 
                   className="w-full cursor-pointer hover:shadow-md transition-shadow" 
                   shadow="sm"
                 >
@@ -169,12 +277,11 @@ export default function Models() {
                           </div>
                           
                           {/* Active status indicator */}
-                          {model.numberOfNodes && model.hostAddresses && 
-                            model.numberOfNodes === model.hostAddresses.length && (
-                              <div className="flex items-center gap-1">
-                                <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-                                <span className="text-xs text-green-600">Active</span>
-                              </div>
+                          {model.hostAddresses.length >= 2 && (
+                            <div className="flex items-center gap-1">
+                              <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                              <span className="text-xs text-green-600">Active</span>
+                            </div>
                           )}
                         </div>
                         <p className="text-sm text-gray-600 mb-2">{model.description}</p>
@@ -182,8 +289,7 @@ export default function Models() {
                         {/* Host information */}
                         <div className="mt-2">
                           <p className="text-xs text-gray-500 mb-1">
-                            Hosted by {model.hostAddresses.length} node(s)
-                            {model.numberOfNodes && ` of ${model.numberOfNodes} required`}
+                            Hosted by {model.hostAddresses.length} node(s) of {model.numberOfNodes} required
                           </p>
                           {model.hostAddresses.length > 0 && (
                             <div className="flex flex-wrap gap-1">
@@ -194,6 +300,13 @@ export default function Models() {
                               ))}
                             </div>
                           )}
+                        </div>
+                        
+                        {/* Pool balance */}
+                        <div className="mt-2">
+                          <p className="text-xs text-gray-500">
+                            Pool Balance: {safeFormatEther(model.poolBalance)} ETH
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -219,83 +332,7 @@ export default function Models() {
         )}
       </div>
       
-      {/* Create Pool Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <ModalContent>
-          <ModalHeader>Create Model Pool</ModalHeader>
-          <ModalBody>
-            <div className="space-y-4">
-              <Input
-                label="Model Name"
-                placeholder="Enter model name"
-                name="name"
-                value={newModel.name}
-                onChange={handleInputChange}
-                isRequired
-              />
-              
-              <Textarea
-                label="Description"
-                placeholder="Enter model description"
-                name="description"
-                value={newModel.description}
-                onChange={handleInputChange}
-              />
-              
-              <Input
-                label="Model URL"
-                placeholder="Enter model API URL"
-                name="modelUrl"
-                value={newModel.modelUrl}
-                onChange={handleInputChange}
-                isRequired
-              />
-              
-              <Input
-                label="Icon Path (optional)"
-                placeholder="Path to model icon"
-                name="icon"
-                value={newModel.icon}
-                onChange={handleInputChange}
-              />
-              
-              <Input
-                type="number"
-                label="Number of Hosts Required"
-                placeholder="Enter number of hosts needed"
-                name="numberOfNodes"
-                value={newModel.numberOfNodes}
-                onChange={handleInputChange}
-                min={1}
-                isRequired
-              />
-              
-              <div className="p-3 bg-gray-50 rounded-md">
-                <p className="text-sm font-medium mb-2">Host Addresses</p>
-                <p className="text-xs text-gray-600">Host addresses cannot be filled at creation. Hosts will join your pool after creation.</p>
-              </div>
-              
-              <div className="p-3 bg-gray-50 rounded-md">
-                <p className="text-sm font-medium mb-2">Node URL</p>
-                <p className="text-xs text-gray-600">The Node URL will be generated automatically once all required hosts have joined.</p>
-              </div>
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <Button color="danger" variant="light" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              color="primary"
-              onClick={handleCreatePool}
-              isLoading={isSubmitting}
-              isDisabled={isSubmitting || !newModel.name || !newModel.description || !newModel.modelUrl}
-            >
-              {isSubmitting ? 'Creating...' : 'Create Pool'}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      
       
       {/* Instructions Modal */}
       <InstructionsModal 
