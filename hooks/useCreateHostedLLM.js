@@ -5,11 +5,9 @@ export default function useCreateHostedLLM(contract, address, fetchLLMEntries) {
   const [isCreatingLLM, setIsCreatingLLM] = useState(false);
   const [resultMessage, setResultMessage] = useState('');
   const [newLLMData, setNewLLMData] = useState({
-    name: '',
-    description: '',
     owner1: '',
     owner2: '',
-    price: '0.001',
+    url: '',
   });
 
   const handleCreateLLMFormChange = (e) => {
@@ -26,50 +24,43 @@ export default function useCreateHostedLLM(contract, address, fetchLLMEntries) {
       setIsCreatingLLM(true);
       setResultMessage('');
 
-      // Validate inputs
-      if (!newLLMData.name || !newLLMData.description) {
-        setResultMessage('Please enter a name and description');
-        setIsCreatingLLM(false);
-        return;
-      }
-
       // Validate owner addresses
       let owner1 = newLLMData.owner1 || address;
       let owner2 = newLLMData.owner2 || address;
 
-      if (!ethers.utils.isAddress(owner1)) {
+      if (!ethers.isAddress(owner1)) {
         setResultMessage('Invalid owner1 address');
         setIsCreatingLLM(false);
         return;
       }
 
-      if (!ethers.utils.isAddress(owner2)) {
+      if (!ethers.isAddress(owner2)) {
         setResultMessage('Invalid owner2 address');
         setIsCreatingLLM(false);
         return;
       }
 
-      // Convert price to wei
-      const priceInWei = ethers.utils.parseEther(newLLMData.price);
+      // Validate URL
+      if (!newLLMData.url) {
+        setResultMessage('Please enter a URL');
+        setIsCreatingLLM(false);
+        return;
+      }
 
       // Create the LLM entry
       const tx = await contract.createHostedLLM(
-        newLLMData.name,
-        newLLMData.description,
         owner1,
         owner2,
-        priceInWei
+        newLLMData.url
       );
 
       await tx.wait();
       
       // Reset form and update state
       setNewLLMData({
-        name: '',
-        description: '',
         owner1: '',
         owner2: '',
-        price: '0.001',
+        url: '',
       });
       
       setResultMessage('LLM created successfully!');

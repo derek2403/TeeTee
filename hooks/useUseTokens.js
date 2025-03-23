@@ -3,32 +3,30 @@ import { ethers } from 'ethers';
 
 export default function useUseTokens(contract, address, fetchTokenBalance) {
   const [isSpendingTokens, setIsSpendingTokens] = useState(false);
-  const [resultMessage, setResultMessage] = useState({ type: '', message: '' });
+  const [resultMessage, setResultMessage] = useState('');
   const [spendTokensData, setSpendTokensData] = useState({
     tokenAmount: '100',
   });
 
   const handleSpendTokensFormChange = (e) => {
     const { name, value } = e.target;
-    setSpendTokensData(prev => ({ ...prev, [name]: value }));
+    setSpendTokensData({
+      ...spendTokensData,
+      [name]: value,
+    });
   };
 
-  const handleSpendTokens = async (e) => {
-    e.preventDefault();
-    
+  const handleSpendTokens = async () => {
     try {
       if (!contract) return;
       
       setIsSpendingTokens(true);
-      setResultMessage({ type: '', message: '' });
+      setResultMessage('');
       
       const { tokenAmount } = spendTokensData;
       
       if (!tokenAmount || parseInt(tokenAmount) <= 0) {
-        setResultMessage({ 
-          type: 'error', 
-          message: 'Please provide a valid token amount' 
-        });
+        setResultMessage('Please provide a valid token amount');
         setIsSpendingTokens(false);
         return;
       }
@@ -37,21 +35,18 @@ export default function useUseTokens(contract, address, fetchTokenBalance) {
       await tx.wait();
       
       setSpendTokensData({ ...spendTokensData, tokenAmount: '100' });
-      setIsSpendingTokens(false);
-      setResultMessage({ 
-        type: 'success', 
-        message: `Successfully used ${tokenAmount} tokens!` 
-      });
+      setResultMessage(`Successfully used ${tokenAmount} tokens!`);
       
       // Update token balance
-      fetchTokenBalance(address, contract);
+      if (fetchTokenBalance) {
+        fetchTokenBalance();
+      }
       
     } catch (error) {
       console.error("Spend tokens error:", error);
-      setResultMessage({ 
-        type: 'error', 
-        message: `Error: ${error.message}` 
-      });
+      setResultMessage(`Error: ${error.message}`);
+      setIsSpendingTokens(false);
+    } finally {
       setIsSpendingTokens(false);
     }
   };
@@ -62,6 +57,5 @@ export default function useUseTokens(contract, address, fetchTokenBalance) {
     spendTokensData,
     handleSpendTokensFormChange,
     handleSpendTokens,
-    setResultMessage,
   };
 } 
