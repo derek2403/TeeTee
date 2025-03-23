@@ -9,8 +9,7 @@
   - [Preparing Your Environment](#preparing-your-environment)
   - [Setting Up Phala Cloud Account](#setting-up-phala-cloud-account)
   - [Deploying Node1 (First Half Layers)](#deploying-node1-first-half-layers)
-  - [Deploying Node2 (Second Half Layers)](#deploying-node2-second-half-layers)
-  - [Connecting Nodes Together](#connecting-nodes-together)
+  - [Connecting to an Existing Node2](#connecting-to-an-existing-node2)
 - [User Interface](#user-interface)
 - [Security and Trust Considerations](#security-and-trust-considerations)
 - [Troubleshooting](#troubleshooting)
@@ -28,7 +27,7 @@ By running LLMs within TEEs, we can provide strong guarantees about:
 - Model integrity: The model code and weights cannot be tampered with
 - Verifiable execution: The system generates attestation reports proving the computation was performed securely
 
-This document provides comprehensive guidance on deploying, integrating, and using the TeeTee system.
+This document provides guidance on deploying the first node (Node1) of the TeeTee layer-split system. Note that this guide assumes Node2 is already deployed and available.
 
 ## Understanding Layer Splitting in LLMs
 
@@ -54,7 +53,7 @@ TeeTee consists of the following components:
 
 1. **Model Layer Splitting Implementation**:
    - Node1 (app1): Processes first half of model layers
-   - Node2 (app2): Processes second half of model layers
+   - Node2 (app2): Processes second half of model layers (deployed separately)
    - Custom PyTorch modules that handle layer splitting and hidden state transfer
 
 2. **Trusted Execution Environment (TEE)**:
@@ -71,37 +70,6 @@ TeeTee consists of the following components:
    - Model selection
    - Token management
 
-Here's a simplified architecture diagram:
-
-```
-┌────────────────────┐         ┌────────────────────┐
-│       Node1        │         │       Node2        │
-│  (First N Layers)  │         │ (Remaining Layers) │
-│                    │         │                    │
-│  ┌──────────────┐  │         │  ┌──────────────┐  │
-│  │ Input        │  │         │  │ Continue     │  │
-│  │ Processing   │  │         │  │ Processing   │  │
-│  └──────┬───────┘  │         │  └──────┬───────┘  │
-│         │          │         │         │          │
-│  ┌──────▼───────┐  │  Hidden │  ┌──────▼───────┐  │
-│  │ Process      │  │  States │  │ Process      │  │
-│  │ First Half   ├──┼─────────┼──► Second Half  │  │
-│  │ Layers       │  │         │  │ Layers       │  │
-│  └──────────────┘  │         │  └──────┬───────┘  │
-│                    │         │         │          │
-│  ┌──────────────┐  │         │  ┌──────▼───────┐  │
-│  │ Generate     │  │         │  │ Token        │  │
-│  │ Attestation  │  │         │  │ Generation   │  │
-│  └──────────────┘  │         │  └──────────────┘  │
-└────────────────────┘         └────────────────────┘
-        │                                 │
-        │                                 │
-        │         ┌───────────┐           │
-        └─────────► Web App   ◄───────────┘
-                  │ Interface │
-                  └───────────┘
-```
-
 ## Prerequisites
 
 Before beginning deployment, ensure you have:
@@ -113,6 +81,7 @@ Before beginning deployment, ensure you have:
 - **Reliable Internet Connection**: For downloading model files and deployment
 - **Web Browser**: For accessing Phala Cloud dashboard
 - **Ethereum Wallet**: For token-based operations (if using the token system)
+- **Node2 URL**: You need access to an already deployed Node2 endpoint
 
 You can verify your Docker installation with:
 
@@ -165,7 +134,7 @@ docker-compose --version
          - HF_HOME=/app/models
          - TRANSFORMERS_OFFLINE=0
          - TOKENIZERS_PARALLELISM=false
-         - NODE2_URL=https://2ac100b57f58fc36993159c1d069cc33b10e8d3f-5001.dstack-prod5.phala.network
+         - NODE2_URL={replace with node2 url}
        restart: on-failure:5
        volumes:
          - /var/run/tappd.sock:/var/run/tappd.sock
@@ -180,7 +149,7 @@ docker-compose --version
          - 8.8.4.4
    ```
 
-   > **Important**: This configuration deploys the first half of the TinyLlama-1.1B-Chat-v1.0 model layers.
+   > **Important**: This configuration deploys the first half of the TinyLlama-1.1B-Chat-v1.0 model layers. You must replace `{replace with node2 url}` with the actual URL of an existing Node2 deployment.
 
 4. **Adjust Resources** (optional):
    - Set CPU and memory requirements based on your needs
@@ -197,52 +166,18 @@ docker-compose --version
    
    ![Network Endpoint](image-1.png)
    
-   - Save this URL as you'll need it to configure Node2
+   - Save this URL for connecting to your application
 
 7. **Verify Node1 Deployment**:
    - Test the health endpoint by visiting `https://your-node1-url/health`
    - You should receive a JSON response with status "ok"
 
-### Deploying Node2 (Second Half Layers)
 
-Follow a similar process as Node1, but with the appropriate Node2 configuration:
+### Connecting to an Existing Node2
 
-1. **Create a New CVM for Node2**
-2. **Use the Node2 Docker Compose Configuration**:
-
-   ```yaml
-   version: '3'
-   services:
-     app2:
-       image: derek2403/app2:latest
-       ports:
-         - "5001:5001"
-       environment:
-         - HF_HOME=/app/models
-         - TRANSFORMERS_OFFLINE=0
-         - TOKENIZERS_PARALLELISM=false
-       restart: on-failure:5
-       volumes:
-         - /var/run/tappd.sock:/var/run/tappd.sock
-       healthcheck:
-         test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
-         interval: 30s
-         timeout: 10s
-         retries: 3
-         start_period: 180s
-       dns:
-         - 8.8.8.8
-         - 8.8.4.4
-   ```
-
-3. **Deploy and Verify Node2**
-4. **Record the Node2 Public Endpoint URL**
-
-### Connecting Nodes Together
-
-1. **Update Node1 Configuration**:
-   - If you deployed Node2 first, you may need to update Node1's `NODE2_URL` environment variable
-   - This can be done by redeploying Node1 with the updated URL
+1. **Verify Communication Between Nodes**:
+   - Make sure the NODE2_URL environment variable is correctly set to a working Node2 endpoint
+   - If needed, redeploy Node1 with the updated URL
 
 2. **Test the Complete Pipeline**:
    - Send a test request to Node1's `/generate` endpoint
@@ -285,7 +220,7 @@ Key features:
 
 1. **Node1 Cannot Connect to Node2**:
    - Verify Node2 URL is correct in Node1's environment variables
-   - Check that both nodes are running (health endpoints)
+   - Check that Node2 is running (health endpoint)
    - Ensure network rules allow communication between nodes
 
 2. **Slow Model Loading**:
@@ -307,7 +242,7 @@ Key features:
 
 ## Monitoring and Performance
 
-- **Health Endpoints**: Both nodes expose `/health` endpoints for monitoring
+- **Health Endpoints**: Node1 exposes a `/health` endpoint for monitoring
 - **Performance Metrics**: Check generation times in the API responses
 - **Phala Dashboard**: Monitor resource usage through the Phala Cloud interface
 - **Token Metrics**: Monitor token usage and balances through the web interface
@@ -330,8 +265,8 @@ A: Costs depend on Phala Cloud pricing and the resources allocated to your CVMs.
 **Q: How are tokens used in the system?**
 A: Tokens are used to pay for model inference (1 token per character), and to reward node operators through the contribution pool.
 
-**Q: Can I deploy this on my own infrastructure instead of Phala Cloud?**
-A: While possible, using Phala Cloud ensures proper TEE configuration and attestation. For custom deployments, you would need to set up your own SGX-enabled environment.
+**Q: Where do I get the Node2 URL from?**
+A: The Node2 URL should be provided by the team or person who has already deployed the second node of the model. This guide only covers deploying Node1.
 
 ## Advanced Configuration Options
 
@@ -355,6 +290,6 @@ For advanced users, the following customization options are available:
 
 ---
 
-**Congratulations!** You have successfully deployed your layer-split LLM in a TEE environment. Your model is now running in a highly secure, privacy-preserving configuration that protects both user data and model integrity.
+**Congratulations!** You have successfully deployed Node1 of the TeeTee layer-split LLM system. You can now use this node to interact with an existing Node2 deployment in a highly secure, privacy-preserving configuration that protects both user data and model integrity.
 
 For additional support, please reach out to our community forum or open an issue in our GitHub repository.
