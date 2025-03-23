@@ -1,5 +1,6 @@
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAccount } from 'wagmi';
 
 export default function Header() {
@@ -11,7 +12,15 @@ export default function Header() {
         <div className="flex justify-between items-center py-6">
           <div className="w-1/5">
             <Link href="/">
-              <h1 className="text-2xl font-bold cursor-pointer">TeeTee</h1>
+              <div className="cursor-pointer">
+                <Image 
+                  src="/logo.png" 
+                  alt="TeeTee Logo" 
+                  width={100} 
+                  height={40} 
+                  priority
+                />
+              </div>
             </Link>
           </div>
           
