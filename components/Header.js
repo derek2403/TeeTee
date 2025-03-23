@@ -29,6 +29,9 @@ export default function Header() {
               <Link href="/AIChat">
                 <span className="font-medium cursor-pointer hover:text-blue-600 transition-colors whitespace-nowrap">AI Chat</span>
               </Link>
+              <Link href="/models">
+                <span className="font-medium cursor-pointer hover:text-blue-600 transition-colors whitespace-nowrap">Models</span>
+              </Link>
               <Link href="/ContributionPool">
                 <span className="font-medium cursor-pointer hover:text-blue-600 transition-colors whitespace-nowrap">Contribution Pool</span>
               </Link>

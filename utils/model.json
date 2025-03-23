@@ -1,0 +1,24 @@
+[
+  {
+    "id": 1,
+    "name": "TinyLlama-1.1B-Chat-v1.0",
+    "description": "A a lightweight, chat-optimized LLaMA-based model with 1.1B parameters, designed for efficient conversational AI",
+    "icon": "https://huggingface.co/TinyLlama/TinyLlama-1.1B-step-50K-105b/resolve/main/TinyLlama_logo.png",
+    "modelUrl": "https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    "nodeURL": "https://0c8426248007674742be42b5c597a7cb9210a300-5002.dstack-prod5.phala.network",
+    "numberOfNodes": 2,
+    "hostAddresses": [
+      "0x41Db99b9A098Af28A06C0af238799c08076Af2f7",
+      "0xf1a7b4b4B16fc24650D3dC96d5112b5c1F309092"
+    ]
+  },
+  {
+    "id": 2,
+    "name": "1",
+    "description": "1",
+    "icon": "1",
+    "modelUrl": "1",
+    "numberOfNodes": 2,
+    "hostAddresses": []
+  }
+]
