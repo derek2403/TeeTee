@@ -187,6 +187,33 @@ Routing responses via TEE 1 maintains a single, straightforward endpoint for use
 
 ---
 
+## Important Code Directories📂 
+
+Here's a brief overview of important directories in our repository:
+
+- **`/TeeDockerFiles`**
+  - Contains all LLM shard implementations inside TEEs.
+  - Includes a detailed README on shard creation and how to host your own TEE node.
+
+- **`/hooks`**
+  - Modular on-chain code, examples including:
+    - `UseDepositToPool.js` function: Users deposit ETH in exchange for LLM tokens.
+    - `UseCheckBalance.js` function: Allows users to check their LLM token balances.
+
+- **`/pages`**
+  - **`chat.js`**: Front-end integration demonstrating token usage, TEE node communication, and retrieval of on-chain attestations.
+  - **`model.js`**: Displays all available models for users to utilize or self-host.
+  - **`ContributionPool.js`**: Interface for registering hosted node links with the smart contract.
+
+- **`/smartcontract/tee.sol`**
+  - Contains the fully functional Solidity smart contract.
+  - Deployed on Base Sepolia: [`0x396061f4eba244416ca7020fa341f8f6a990d991`](https://sepolia.basescan.org/address/0x396061f4eba244416ca7020fa341f8f6a990d991) (Verified Contract)
+
+
+
+
+
+---
 ## How We Are Different🌟
 
 We recognized a key gap: many teams want to securely wrap LLMs within a Trusted Execution Environment (TEE), but existing TEEs have strict size limits, preventing large models from being fully hosted. Moreover, current GPU providers, although helpful in hosting models, operate centralized services and cannot fully guarantee data privacy.
