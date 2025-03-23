@@ -2,12 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { useAccount, useBalance } from 'wagmi';
+import { useDepositToPool } from '../hooks';
+import { ethers } from 'ethers';
+import contractABI from '../utils/ABI.json';
 
-const Token = ({ tokenBalance, onClose, isDropdown = false }) => {
+const Token = ({ tokenBalance, onClose, isDropdown = false, contract: externalContract, fetchTokenBalance }) => {
   const popupRef = useRef(null);
   const [ethAmount, setEthAmount] = useState('');
   const [tokenAmount, setTokenAmount] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [error, setError] = useState('');
+  const [contract, setContract] = useState(externalContract);
   
   // Get wallet info
   const { address, isConnected } = useAccount();
@@ -16,11 +21,51 @@ const Token = ({ tokenBalance, onClose, isDropdown = false }) => {
     watch: true,
   });
   
+  // Initialize contract if not provided externally
+  useEffect(() => {
+    const initContract = async () => {
+      if (!contract && window.ethereum && isConnected) {
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const signer = await provider.getSigner();
+          const contractAddress = '0x4785815a0CBA353484D566029471Fa2E4C596a3a';
+          const newContract = new ethers.Contract(contractAddress, contractABI, signer);
+          setContract(newContract);
+          console.log("Contract initialized successfully");
+        } catch (error) {
+          console.error("Failed to initialize contract:", error);
+          setError("Failed to initialize contract. Check console for details.");
+        }
+      }
+    };
+    
+    initContract();
+  }, [contract, isConnected]);
+  
+  // Use the deposit hook for token purchase functionality
+  const { 
+    isDepositing, 
+    resultMessage, 
+    depositData, 
+    handleDepositFormChange, 
+    handleDeposit 
+  } = useDepositToPool(contract, fetchTokenBalance);
+
+  // Set fixed LLM ID as per requirement (0)
+  useEffect(() => {
+    if (contract) {
+      handleDepositFormChange({ target: { name: 'llmId', value: '0' }});
+    }
+  }, [contract]);
+  
   // Calculate token amount based on ETH input (0.002 ETH = 100,000 tokens)
   useEffect(() => {
     if (ethAmount && !isNaN(parseFloat(ethAmount))) {
       const calculatedTokens = (parseFloat(ethAmount) / 0.002) * 100000;
       setTokenAmount(calculatedTokens.toLocaleString());
+      
+      // Update the deposit amount in the hook state
+      handleDepositFormChange({ target: { name: 'amount', value: ethAmount }});
     } else {
       setTokenAmount('');
     }
@@ -31,6 +76,7 @@ const Token = ({ tokenBalance, onClose, isDropdown = false }) => {
     const value = e.target.value;
     if (value === '' || !isNaN(parseFloat(value))) {
       setEthAmount(value);
+      setError(''); // Clear any previous errors
     }
   };
   
@@ -47,6 +93,54 @@ const Token = ({ tokenBalance, onClose, isDropdown = false }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [onClose]);
+
+  // Handle token purchase
+  const handleTokenPurchase = async () => {
+    try {
+      setError('');
+      
+      // Validation checks
+      if (!contract) {
+        setError('Smart contract not initialized');
+        return;
+      }
+      
+      if (!isConnected) {
+        setError('Wallet not connected');
+        return;
+      }
+      
+      if (!ethAmount || parseFloat(ethAmount) < 0.002) {
+        setError('Minimum amount is 0.002 ETH');
+        return;
+      }
+      
+      // Make sure the LLM ID is set properly
+      if (depositData.llmId !== '0') {
+        handleDepositFormChange({ target: { name: 'llmId', value: '0' }});
+      }
+      
+      // Directly call the contract to ensure we're bypassing any issues with the hook
+      if (ethAmount && parseFloat(ethAmount) >= 0.002) {
+        console.log('Attempting to purchase tokens...');
+        console.log('Contract:', contract);
+        console.log('Amount:', ethAmount, 'ETH');
+        console.log('LLM ID:', depositData.llmId);
+        
+        // Call the hook's deposit method
+        await handleDeposit();
+        
+        // Reset fields on success
+        if (!resultMessage.includes('Error')) {
+          setEthAmount('');
+          setTokenAmount('');
+        }
+      }
+    } catch (error) {
+      console.error('Token purchase error:', error);
+      setError(error.message || 'Error purchasing tokens');
+    }
+  };
 
   return (
     <div ref={popupRef} className="flex flex-col w-full">
@@ -109,28 +203,52 @@ const Token = ({ tokenBalance, onClose, isDropdown = false }) => {
         </div>
       </div>
       
+      {/* Display any errors */}
+      {error && (
+        <div className="px-4 mb-2 text-sm text-red-500">
+          Error: {error}
+        </div>
+      )}
+      
+      {/* Display result message if any */}
+      {resultMessage && (
+        <div className={`px-4 mb-2 text-sm ${
+          resultMessage.includes('Error') ? 'text-red-500' : 'text-green-500'
+        }`}>
+          {resultMessage}
+        </div>
+      )}
+      
+      {/* Debug info for development */}
+      <div className="px-4 mb-2 text-xs text-gray-400">
+        Contract loaded: {contract ? 'Yes' : 'No'} | 
+        Wallet connected: {isConnected ? 'Yes' : 'No'} | 
+        LLM ID: {depositData.llmId || '0'}
+      </div>
+      
       {/* Purchase button */}
       <div className="px-4 pb-4">
         <button 
           className={`w-full py-3 px-4 rounded-full text-lg font-medium ${
-            ethAmount && parseFloat(ethAmount) >= 0.002 
-              ? 'bg-blue-500 text-white' 
+            ethAmount && parseFloat(ethAmount) >= 0.002 && !isDepositing && contract && isConnected
+              ? 'bg-blue-500 text-white hover:bg-blue-600' 
               : 'bg-blue-200 text-white cursor-not-allowed'
           }`}
-          disabled={!ethAmount || parseFloat(ethAmount) < 0.002}
-          onClick={() => {
-            if (ethAmount && parseFloat(ethAmount) >= 0.002) {
-              // Here you would implement the actual purchase logic
-              alert(`Purchase of ${tokenAmount} tokens initiated!`);
-              // onClose(); // Uncomment this to close after purchase
-            }
-          }}
+          disabled={!ethAmount || parseFloat(ethAmount) < 0.002 || isDepositing || !contract || !isConnected}
+          onClick={handleTokenPurchase}
         >
-          Purchase
+          {isDepositing ? 'Processing...' : 'Purchase'}
         </button>
         {(ethAmount && parseFloat(ethAmount) < 0.002) && (
           <p className="text-xs text-red-500 mt-1 text-center">
             Minimum purchase amount is 0.002 ETH
+          </p>
+        )}
+        
+        {/* Show current token balance if available */}
+        {tokenBalance && (
+          <p className="text-xs text-gray-500 mt-2 text-center">
+            Your current token balance: {tokenBalance}
           </p>
         )}
       </div>
